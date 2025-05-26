@@ -1,0 +1,9 @@
+{
+  "version": "1",
+  "name": "Clearis-Dev",
+  "type": "collection",
+  "ignore": [
+    "node_modules",
+    ".git"
+  ]
+}

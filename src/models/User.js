@@ -3,15 +3,20 @@ import { sequelize } from '../db.js';
 
 export const User = sequelize.define("user", {
   id: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.STRING,
     primaryKey: true,
-    autoIncrement: true,
+    allowNull: false, 
+    autoIncrement: false,
   },
-  nombre: {
+  name: {
     type: DataTypes.STRING,
     allowNull: false,
   },
-  correo: {
+  lastname: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+  email: {
     type: DataTypes.STRING,
     allowNull: false,
     unique: true,
@@ -19,13 +24,17 @@ export const User = sequelize.define("user", {
       isEmail: true,
     },
   },
-  telefono: {
+  tel: {
     type: DataTypes.STRING,
     allowNull: false, 
   },
-  direccion: {
+  address: {
     type: DataTypes.STRING,
     allowNull: true,
+  },
+  password: {
+    type: DataTypes.STRING,
+    allowNull: false,
   }
 }, {
   timestamps: false, 

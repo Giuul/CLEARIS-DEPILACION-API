@@ -1,6 +1,6 @@
 import { DataTypes } from 'sequelize';
 import { sequelize } from '../db.js'; 
-import { User} from './User.js'; 
+import { User } from './User.js'; 
 import { Service } from './Service.js'; 
 
 export const Turno = sequelize.define("turno", {
@@ -8,7 +8,6 @@ export const Turno = sequelize.define("turno", {
     type: DataTypes.INTEGER,
     primaryKey: true,
     autoIncrement: true,
-    allowNull: false, 
   },
   dniusuario: {
     type: DataTypes.STRING, 
@@ -35,4 +34,10 @@ Turno.belongsTo(Service, {
   foreignKey: 'idservicio', 
   targetKey: 'id',         
   as: 'servicio'           
+});
+
+Turno.belongsTo(User, {
+  foreignKey: 'dniusuario', 
+  targetKey: 'id',        
+  as: 'usuario'         
 });

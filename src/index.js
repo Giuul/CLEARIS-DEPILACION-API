@@ -1,4 +1,5 @@
 import express from 'express';
+import cors from 'cors'; // ¡Importa cors!
 import { PORT } from "./config.js";
 import { sequelize } from './db.js';
 import "./models/User.js"
@@ -10,13 +11,25 @@ import turnoRoutes from "./routes/turno.routes.js"
 
 const app = express();
 
-try {
-    app.listen(PORT);
-    app.use(userRoutes);
-    app.use(serviceRoutes);
-    app.use(turnoRoutes) 
-    await sequelize.sync();
-    console.log(`Server listening on port ${PORT}`);
-} catch (error) {
-    console.log(`There was an error on initialization`,);
+
+app.use(cors()); 
+app.use(express.json());
+
+
+app.use(userRoutes);
+app.use(serviceRoutes);
+app.use(turnoRoutes)
+
+async function main() {
+  try {
+    await sequelize.sync({ force: false }); 
+    console.log('Base de datos conectada y sincronizada.');
+    app.listen(PORT, () => { 
+      console.log(`Server listening on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error(`Hubo un error en la inicialización:`, error);
+  }
 }
+
+main(); 

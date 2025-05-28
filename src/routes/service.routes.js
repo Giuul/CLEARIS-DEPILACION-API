@@ -1,14 +1,17 @@
 import { Router } from "express";
+import { Service } from "../models/Service.js";
 
 const router = Router();
 
-router.get("/service", (req, res) => {
-    res.send("obteniendo servicios");
+router.get("/service", async(req, res) => {
+    const services = await Service.findAll();
+    res.json(services);
 });
 
-router.get("/service/:id", (req, res) => {
+router.get("/service/:id", async(req, res) => {
     const { id } = req.params;
-    res.send(`obteniendo servicio con id ${id}`);
+    const service = await Service.findByPk(id);
+    res.json(service);
 });
 
 router.post("/service", (req, res) => {

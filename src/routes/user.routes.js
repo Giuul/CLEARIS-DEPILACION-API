@@ -14,7 +14,7 @@ router.get("/users/:id", (req, res) => {
 });
 
 router.post("/users", async (req, res) => {
-    
+
     const { id, name, lastname, email, tel, address, password, repPassword } = req.body;
 
     try {
@@ -22,23 +22,23 @@ router.post("/users", async (req, res) => {
             return res.status(400).json({ message: "Las contraseñas no coinciden." });
         }
 
-        const salt = await bcrypt.genSalt(10); 
+        const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        
+
         const newUser = await User.create({
-            id: id,          
-            name: name,       
-            lastname: lastname, 
-            email: email,     
-            tel: tel,        
-            address: address, 
-            password: hashedPassword 
+            id: id,
+            name: name,
+            lastname: lastname,
+            email: email,
+            tel: tel,
+            address: address,
+            password: hashedPassword
         });
 
-        
+
         const userResponse = newUser.toJSON();
-        delete userResponse.password; 
+        delete userResponse.password;
 
         res.status(201).json(userResponse);
 

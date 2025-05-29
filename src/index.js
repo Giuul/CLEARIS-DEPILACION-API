@@ -1,5 +1,5 @@
 import express from 'express';
-import cors from 'cors'; 
+import cors from 'cors'; // ¡Importa cors!
 import { PORT } from "./config.js";
 import { sequelize } from './db.js';
 import "./models/User.js"

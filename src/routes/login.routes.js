@@ -5,7 +5,7 @@ import jwt from 'jsonwebtoken';
 
 const router = Router();
 
-const JWT_SECRET = 'tu_clave_super_secreta';
+const JWT_SECRET = 'usuario-correcto';
 
 router.post('/login', async (req, res) => {
 
@@ -30,6 +30,15 @@ router.post('/login', async (req, res) => {
         if (!passwordValida) {
             return res.status(401).json({ message: 'Usuario o contraseña incorrectos' });
         }
+
+         const token = jwt.sign(
+            { id: user.id, email: user.email },
+            JWT_SECRET,
+            { expiresIn: '1h' }
+        );
+        return res.json({ token });
+
+
     } catch (error) {
         console.error('Error en login:', error);
         res.status(500).json({ message: 'Error interno del servidor' });

@@ -31,7 +31,7 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ message: 'Usuario o contraseña incorrectos' });
         }
 
-         const token = jwt.sign(
+        const token = jwt.sign(
             { id: user.id, email: user.email },
             JWT_SECRET,
             { expiresIn: '1h' }

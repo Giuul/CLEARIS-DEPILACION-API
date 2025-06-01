@@ -2,6 +2,7 @@ import { Router } from "express"
 import { Turno } from "../models/Turno.js";
 import { User } from "../models/User.js";
 import { Service } from "../models/Service.js";
+import { verifyToken } from '../middleware/auth.js';
 
 const router = Router()
 
@@ -42,16 +43,17 @@ router.get("/turnos/:id", async (req, res) => {
     }
 });
 
-router.post('/turnos', async (req, res) => {
+router.post('/turnos', verifyToken, async (req, res) => {
     try {
-        const { dniusuario, dia, hora, idservicio } = req.body;
-
+       
+        const dniusuario = req.dniusuario;
+        const { dia, hora, idservicio } = req.body;
         if (!dniusuario || !dia || !hora || !idservicio) {
             return res.status(400).json({ mensaje: 'Faltan campos obligatorios' });
         }
 
         const nuevoTurno = await Turno.create({
-            dniusuario,
+            dniusuario, 
             dia,
             hora,
             idservicio
@@ -60,9 +62,14 @@ router.post('/turnos', async (req, res) => {
         res.status(201).json(nuevoTurno);
     } catch (error) {
         console.error("Error al crear turno:", error);
-        res.status(500).json({ mensaje: "Error al crear turno", error });
+        res.status(500).json({
+            mensaje: "Error al crear turno",
+            error: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 });
+
 
 router.put("/turnos/:id", async (req, res) => {
     const { id } = req.params;

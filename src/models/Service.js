@@ -16,7 +16,7 @@ export const Service = sequelize.define('Service', {
     allowNull: false,
   },
   imagen: {
-    type: DataTypes.STRING, // hay que guardar la ruta de la imagen
+    type: DataTypes.STRING,
     allowNull: true,
   },
 }, {

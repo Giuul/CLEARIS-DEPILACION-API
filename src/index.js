@@ -21,6 +21,7 @@ app.use(serviceRoutes);
 app.use(turnoRoutes);
 app.use(loginRoutes);
 
+
 async function main() {
   try {
     await sequelize.sync({ force: false });

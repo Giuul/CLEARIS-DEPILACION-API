@@ -15,27 +15,32 @@ router.get("/users/:id", (req, res) => {
 
 router.post("/users", async (req, res) => {
 
-    const { id, name, lastname, email, tel, address, password, repPassword } = req.body;
+    const { id, name, lastname, email, tel, address, password, repPassword, role } = req.body;
 
     try {
         if (password !== repPassword) {
             return res.status(400).json({ message: "Las contraseñas no coinciden." });
         }
 
+        
+        const validRoles = ['admin', 'user'];
+        if (role && !validRoles.includes(role)) {
+            return res.status(400).json({ message: "Rol inválido. Solo 'admin' o 'user' son permitidos." });
+        }
+
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-
         const newUser = await User.create({
-            id: id,
-            name: name,
-            lastname: lastname,
-            email: email,
-            tel: tel,
-            address: address,
-            password: hashedPassword
+            id,
+            name,
+            lastname,
+            email,
+            tel,
+            address,
+            password: hashedPassword,
+            role: role || 'user'  
         });
-
 
         const userResponse = newUser.toJSON();
         delete userResponse.password;

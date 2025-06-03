@@ -4,7 +4,7 @@ import { Service } from "../models/Service.js";
 const router = Router();
 
 router.get("/service", async(req, res) => {
-    const services = await Service.findAll();
+    const  services = await Service.findAll();
     res.json(services);
 });
 

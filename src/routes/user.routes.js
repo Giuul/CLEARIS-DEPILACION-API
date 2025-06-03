@@ -48,7 +48,7 @@ router.post("/users", async (req, res) => {
 
 
         const userCount = await User.count();
-        if (userCount === 0 && roleInput === 'superadmin') {
+        if (userCount === 0 && role === 'superadmin') {
              
         } else if (req.userRole === 'superadmin' || req.userRole === 'admin') {
             

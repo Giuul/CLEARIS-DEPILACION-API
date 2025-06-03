@@ -16,6 +16,7 @@ export const verifyToken = (req, res, next) => {
         req.dniusuario = decoded.id;
         req.idUser = decoded.id;
         req.userEmail = decoded.email;
+        req.userRole = decoded.role;
 
         next();
     } catch (error) {
@@ -24,5 +25,28 @@ export const verifyToken = (req, res, next) => {
             return res.status(401).json({ mensaje: 'Token de autenticación expirado. Por favor, inicia sesión de nuevo.' });
         }
         return res.status(403).json({ mensaje: 'Token de autenticación inválido.', error: error.message });
+    }
+};
+export const isSuperAdmin = (req, res, next) => {
+    if (req.userRole && req.userRole === 'superadmin') {
+        next();
+    } else {
+        return res.status(403).json({ message: 'Acceso denegado. Se requiere rol de Superadministrador.' });
+    }
+};
+
+export const isAdmin = (req, res, next) => {
+    if (req.userRole && req.userRole === 'admin') {
+        next();
+    } else {
+        return res.status(403).json({ message: 'Acceso denegado. Se requiere rol de Administrador.' });
+    }
+};
+
+export const isAdminOrSuperAdmin = (req, res, next) => {
+    if (req.userRole && (req.userRole === 'admin' || req.userRole === 'superadmin')) {
+        next();
+    } else {
+        return res.status(403).json({ message: 'Acceso denegado. Se requiere rol de Administrador o Superadministrador.' });
     }
 };

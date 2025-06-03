@@ -19,6 +19,11 @@ export const Service = sequelize.define('Service', {
     type: DataTypes.STRING,
     allowNull: true,
   },
+  duracion: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
+ 
 }, {
   timestamps: false,
 });

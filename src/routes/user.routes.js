@@ -96,8 +96,6 @@ router.put("/users/:id", verifyToken, isAdminOrSuperAdmin, async (req, res) => {
         const userToUpdate = await User.findByPk(targetUserId);
         if (!userToUpdate) return res.status(404).json({ message: "Usuario no encontrado." });
 
-        // === Lógica de Autorización para la actualización ===
-        // Un admin solo puede modificar usuarios comunes (role: 'user')
         if (req.userRole === 'admin') {
             if (userToUpdate.role !== 'user') {
                 return res.status(403).json({ message: "Los administradores solo pueden modificar usuarios comunes." });

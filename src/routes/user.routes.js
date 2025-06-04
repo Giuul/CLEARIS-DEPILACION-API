@@ -21,30 +21,18 @@ router.get("/users", verifyToken, isAdminOrSuperAdmin, async (req, res) => {
     }
 });
 
-router.get("/users/:id", verifyToken, async (req, res) => {
+router.get("/users/:id", verifyToken, isAdminOrSuperAdmin, async (req, res) => {
     const { id } = req.params;
     try {
         const user = await User.findByPk(id, { attributes: { exclude: ['password'] } });
         if (!user) return res.status(404).json({ message: "Usuario no encontrado." });
 
-        if (req.dniusuario === id) {
-            return res.json(user);
-        }
 
-        if (req.userRole === 'superadmin') {
-            return res.json(user);
-        } else if (req.userRole === 'admin') {
-            if (user.role === 'user') {
-                return res.json(user);
-            } else {
-                return res.status(403).json({ message: "Acceso denegado a este perfil de usuario." });
-            }
-        } else {
-            return res.status(403).json({ message: "Acceso denegado. No tienes permiso para ver otros perfiles." });
+        if (req.userRole === 'admin' && (user.role === 'superadmin' || (user.role === 'admin' && user.id !== req.userId))) {
+            return res.status(403).json({ message: "Acceso denegado a este perfil de usuario." });
         }
 
     } catch (error) {
-        console.error("Error al obtener usuario por ID:", error);
         res.status(500).json({ message: "Error interno del servidor." });
     }
 });
@@ -99,55 +87,35 @@ router.post("/users", async (req, res) => {
     }
 });
 
-router.put("/users/:id", verifyToken, async (req, res) => {
+router.put("/users/:id", verifyToken, isAdminOrSuperAdmin, async (req, res) => {
     const { id: targetUserId } = req.params;
-    const { name, lastname, email, tel, address } = req.body;
-    const password = req.body.password;
-    const repPassword = req.body.repPassword;
-    const role = req.body.role;
+    const { name, lastname, email, tel, address, role } = req.body;
 
     try {
         const userToUpdate = await User.findByPk(targetUserId);
         if (!userToUpdate) return res.status(404).json({ message: "Usuario no encontrado." });
 
-        if (req.dniusuario !== targetUserId) {
-            if (req.userRole === 'user') {
-                return res.status(403).json({ message: "Acceso denegado. Solo puedes actualizar tu propio perfil." });
-            }
-        }
-
         if (req.userRole === 'admin') {
-            if (userToUpdate.role !== 'user' && req.dniusuario !== targetUserId) {
+            if (userToUpdate.role !== 'user') {
                 return res.status(403).json({ message: "Los administradores solo pueden modificar usuarios comunes." });
             }
+
             if (role && role !== userToUpdate.role) {
                 return res.status(403).json({ message: "Los administradores no pueden cambiar roles de usuario." });
             }
-        } else if (req.userRole === 'superadmin') {
-            if (userToUpdate.role === 'superadmin' && req.dniusuario !== targetUserId && role && role !== userToUpdate.role) {
-                return res.status(403).json({ message: "No se puede modificar el rol de otro Superadministrador directamente." });
+        }
+
+        else if (req.userRole === 'superadmin') {
+            if (userToUpdate.role === 'superadmin' && req.userId !== targetUserId) {
+                return res.status(403).json({ message: "No se puede modificar otro Superadministrador directamente." });
             }
-            if (role && !['user', 'admin', 'superadmin'].includes(role)) {
+            if (role && ['user', 'admin'].includes(role)) {
+                userToUpdate.role = role;
+            } else if (role && role !== userToUpdate.role) {
                 return res.status(400).json({ message: `Rol '${role}' inválido para asignación.` });
             }
-            if (role && role !== userToUpdate.role) {
-                userToUpdate.role = role;
-            }
         }
 
-        if (req.dniusuario === targetUserId && req.userRole === 'user' && role && role !== userToUpdate.role) {
-            return res.status(403).json({ message: "No tienes permiso para cambiar tu propio rol." });
-        }
-
-        if (password && repPassword) {
-            if (password !== repPassword) {
-                return res.status(400).json({ message: "Las contraseñas no coinciden." });
-            }
-            const salt = await bcrypt.genSalt(10);
-            userToUpdate.password = await bcrypt.hash(password, salt);
-        } else if ((password && !repPassword) || (!password && repPassword)) {
-            return res.status(400).json({ message: "Debes proporcionar ambas contraseñas si deseas cambiarla." });
-        }
 
         if (email && email !== userToUpdate.email) {
             const existingEmailUser = await User.findOne({ where: { email } });
@@ -155,6 +123,7 @@ router.put("/users/:id", verifyToken, async (req, res) => {
                 return res.status(409).json({ message: "El nuevo correo electrónico ya está en uso." });
             }
         }
+
 
         userToUpdate.name = name ?? userToUpdate.name;
         userToUpdate.lastname = lastname ?? userToUpdate.lastname;
@@ -166,7 +135,6 @@ router.put("/users/:id", verifyToken, async (req, res) => {
 
         const userResponse = userToUpdate.toJSON();
         delete userResponse.password;
-
         res.json({ message: "Usuario actualizado.", user: userResponse });
 
     } catch (error) {

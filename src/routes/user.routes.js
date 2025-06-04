@@ -21,17 +21,20 @@ router.get("/users", verifyToken, isAdminOrSuperAdmin, async (req, res) => {
     }
 });
 
-router.get("/users/:id", verifyToken, isAdminOrSuperAdmin, async (req, res) => {
+router.get("/users/:id", verifyToken, async (req, res) => {
     const { id } = req.params;
     try {
         const user = await User.findByPk(id, { attributes: { exclude: ['password'] } });
         if (!user) return res.status(404).json({ message: "Usuario no encontrado." });
 
-
-        if (req.userRole === 'admin' && (user.role === 'superadmin' || (user.role === 'admin' && user.id !== req.userId))) {
+        if (req.userRole === 'user' && req.dniusuario !== id) {
             return res.status(403).json({ message: "Acceso denegado a este perfil de usuario." });
         }
 
+        if (req.userRole === 'admin' && (user.role === 'superadmin' || (user.role === 'admin' && user.id !== req.dniusuario))) {
+            return res.status(403).json({ message: "Acceso denegado a este perfil de usuario." });
+        }
+        res.json(user);
     } catch (error) {
         res.status(500).json({ message: "Error interno del servidor." });
     }
@@ -87,13 +90,22 @@ router.post("/users", async (req, res) => {
     }
 });
 
-router.put("/users/:id", verifyToken, isAdminOrSuperAdmin, async (req, res) => {
+router.put("/users/:id", verifyToken, async (req, res) => {
     const { id: targetUserId } = req.params;
     const { name, lastname, email, tel, address, role } = req.body;
 
     try {
         const userToUpdate = await User.findByPk(targetUserId);
         if (!userToUpdate) return res.status(404).json({ message: "Usuario no encontrado." });
+
+        if (req.userRole === 'user') {
+            if (req.dniusuario !== targetUserId) {
+                return res.status(403).json({ message: "Acceso denegado: solo puede modificar su propio perfil." });
+            }
+            if (role && role !== userToUpdate.role) {
+                return res.status(403).json({ message: "No puede cambiar el rol de usuario." });
+            }
+        }        
 
         if (req.userRole === 'admin') {
             if (userToUpdate.role !== 'user') {

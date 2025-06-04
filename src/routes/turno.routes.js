@@ -6,22 +6,31 @@ import { verifyToken } from '../middleware/auth.js';
 
 const router = Router()
 
-router.get("/turnos", async (req, res) => {
+router.get("/misturnos", verifyToken, async (req, res) => {
     try {
+        const dniusuario = req.dniusuario;
+
         const turnos = await Turno.findAll({
+            where: { dniusuario },
             include: [
                 { model: User, as: "usuario" },
                 { model: Service, as: "servicio" }
             ]
         });
+
+        console.log("dniusuario recibido:", dniusuario);
+
         res.json(turnos);
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ mensaje: "Error al obtener turnos", error });
+        console.error("Error al obtener turnos del usuario:", error);
+        res.status(500).json({
+            mensaje: "Error al obtener tus turnos",
+            error: error.message
+        });
     }
 });
 
-router.get("/turnos/:id", async (req, res) => {
+router.get("/misturnos/:id", async (req, res) => {
     const { id } = req.params;
     console.log("ID recibido:", id);
     try {
@@ -43,9 +52,9 @@ router.get("/turnos/:id", async (req, res) => {
     }
 });
 
-router.post('/turnos', verifyToken, async (req, res) => {
+router.post('/misturnos', verifyToken, async (req, res) => {
     try {
-       
+
         const dniusuario = req.dniusuario;
         const { dia, hora, idservicio } = req.body;
         if (!dniusuario || !dia || !hora || !idservicio) {
@@ -53,7 +62,7 @@ router.post('/turnos', verifyToken, async (req, res) => {
         }
 
         const nuevoTurno = await Turno.create({
-            dniusuario, 
+            dniusuario,
             dia,
             hora,
             idservicio
@@ -71,7 +80,7 @@ router.post('/turnos', verifyToken, async (req, res) => {
 });
 
 
-router.put("/turnos/:id", async (req, res) => {
+router.put("/misturnos/:id", async (req, res) => {
     const { id } = req.params;
 
     try {
@@ -88,7 +97,7 @@ router.put("/turnos/:id", async (req, res) => {
     }
 });
 
-router.delete("/turnos/:id", async (req, res) => {
+router.delete("/misturnos/:id", async (req, res) => {
     const { id } = req.params;
 
     try {

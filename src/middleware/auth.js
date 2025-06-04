@@ -14,7 +14,6 @@ export const verifyToken = (req, res, next) => {
         const decoded = jwt.verify(token, JWT_SECRET);
 
         req.dniusuario = decoded.id;
-        req.idUser = decoded.id;
         req.userEmail = decoded.email;
         req.userRole = decoded.role;
 

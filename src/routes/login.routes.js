@@ -5,8 +5,7 @@ import jwt from 'jsonwebtoken';
 
 const router = Router();
 
-
-const JWT_SECRET = 'usuario-correcto'; 
+const JWT_SECRET = 'usuario-correcto';
 
 router.post('/login', async (req, res) => {
     console.log('Body recibido:', req.body);
@@ -31,17 +30,15 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ message: 'Usuario o contraseña incorrectos' });
         }
 
-        // Crea el token con la información básica
         const token = jwt.sign(
             { id: user.id, email: user.email, role: user.role },
             JWT_SECRET,
             { expiresIn: '1h' }
         );
 
-        // ¡IMPORTANTE! Devuelve también el nombre y apellido del usuario
         return res.json({
             token,
-            user: { 
+            user: {
                 id: user.id,
                 name: user.name,
                 lastname: user.lastname,

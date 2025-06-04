@@ -11,7 +11,7 @@ router.get("/users", verifyToken, isAdminOrSuperAdmin, async (req, res) => {
         if (req.userRole === 'admin') {
             queryOptions.where = { role: 'user' };
         } else if (req.userRole === 'superadmin') {
-            queryOptions.where = { role: ['user', 'admin'] }; 
+            queryOptions.where = { role: ['user', 'admin'] };
         }
         const users = await User.findAll(queryOptions);
         res.json(users);
@@ -21,52 +21,43 @@ router.get("/users", verifyToken, isAdminOrSuperAdmin, async (req, res) => {
     }
 });
 
-router.get('/users/:id', verifyToken, async (req, res) => {
+router.get("/users/:id", verifyToken, isAdminOrSuperAdmin, async (req, res) => {
+    const { id } = req.params;
     try {
-        const userIdToFetch = req.params.id; 
+        const user = await User.findByPk(id, { attributes: { exclude: ['password'] } });
+        if (!user) return res.status(404).json({ message: "Usuario no encontrado." });
 
-        const loggedInUserId = req.dniusuario; 
 
-        if (req.userRole !== 'admin' && req.userRole !== 'superadmin' && userIdToFetch !== loggedInUserId) {
-            return res.status(403).json({ message: "Acceso denegado. Solo puedes ver tu propio perfil." });
+        if (req.userRole === 'admin' && (user.role === 'superadmin' || (user.role === 'admin' && user.id !== req.userId))) {
+            return res.status(403).json({ message: "Acceso denegado a este perfil de usuario." });
         }
 
-        const user = await User.findByPk(userIdToFetch, {
-            attributes: ['id', 'name', 'lastname', 'email', 'tel', 'address'] 
-        });
-
-        if (!user) {
-            return res.status(404).json({ message: "Usuario no encontrado." });
-        }
-        res.json(user);
     } catch (error) {
-        console.error("Error al obtener perfil de usuario:", error);
         res.status(500).json({ message: "Error interno del servidor." });
     }
 });
 
 router.post("/users", async (req, res) => {
     const { id, name, lastname, email, tel, address, password, repPassword } = req.body;
-    let { role } = req.body; 
+    let { role } = req.body;
 
     try {
         if (password !== repPassword) {
             return res.status(400).json({ message: "Las contraseñas no coinciden." });
         }
 
-
         const userCount = await User.count();
         if (userCount === 0 && role === 'superadmin') {
-             
+
         } else if (req.userRole === 'superadmin' || req.userRole === 'admin') {
-            
+
             const validRolesToAssign = (req.userRole === 'superadmin') ? ['user', 'admin'] : ['user'];
             if (role && !validRolesToAssign.includes(role)) {
                 return res.status(400).json({ message: `Rol '${role}' inválido o no tienes permiso para asignarlo.` });
             }
-            if (!role) role = 'user'; 
+            if (!role) role = 'user';
         } else {
-            
+
             role = 'user';
         }
 
@@ -77,7 +68,7 @@ router.post("/users", async (req, res) => {
         const newUser = await User.create({
             id, name, lastname, email, tel, address,
             password: hashedPassword,
-            role: role 
+            role: role
         });
 
         const userResponse = newUser.toJSON();
@@ -96,72 +87,105 @@ router.post("/users", async (req, res) => {
     }
 });
 
-router.put('/users/:id', verifyToken, async (req, res) => {
+router.put("/users/:id", verifyToken, isAdminOrSuperAdmin, async (req, res) => {
+    const { id: targetUserId } = req.params;
+    const { name, lastname, email, tel, address, role } = req.body;
+
     try {
-        const userIdToUpdate = req.params.id;      
-        const loggedInUserId = req.dniusuario;     
-        const loggedInUserRole = req.userRole;     
+        const userToUpdate = await User.findByPk(targetUserId);
+        if (!userToUpdate) return res.status(404).json({ message: "Usuario no encontrado." });
 
-        
-        if (loggedInUserRole === 'user' && userIdToUpdate !== loggedInUserId) {
-            
-            return res.status(403).json({ message: "Acceso denegado. Solo puedes modificar tu propio perfil." });
-        }
-        
+        if (req.userRole === 'admin') {
+            if (userToUpdate.role !== 'user') {
+                return res.status(403).json({ message: "Los administradores solo pueden modificar usuarios comunes." });
+            }
 
-       
-        const { name, lastname, email, tel, address } = req.body;
-        const user = await User.findByPk(userIdToUpdate);
-
-        if (!user) {
-            return res.status(404).json({ message: "Usuario no encontrado." });
+            if (role && role !== userToUpdate.role) {
+                return res.status(403).json({ message: "Los administradores no pueden cambiar roles de usuario." });
+            }
         }
 
-        user.name = name || user.name;
-        user.lastname = lastname || user.lastname;
-        user.email = email || user.email;
-        user.tel = tel || user.tel;
-        user.address = address || user.address;
+        else if (req.userRole === 'superadmin') {
+            if (userToUpdate.role === 'superadmin' && req.userId !== targetUserId) {
+                return res.status(403).json({ message: "No se puede modificar otro Superadministrador directamente." });
+            }
+            if (role && ['user', 'admin'].includes(role)) {
+                userToUpdate.role = role;
+            } else if (role && role !== userToUpdate.role) {
+                return res.status(400).json({ message: `Rol '${role}' inválido para asignación.` });
+            }
+        }
 
-        await user.save();
-        res.json({ message: "Perfil actualizado exitosamente.", user: user });
+
+        if (email && email !== userToUpdate.email) {
+            const existingEmailUser = await User.findOne({ where: { email } });
+            if (existingEmailUser && existingEmailUser.id !== targetUserId) {
+                return res.status(409).json({ message: "El nuevo correo electrónico ya está en uso." });
+            }
+        }
+
+
+        userToUpdate.name = name ?? userToUpdate.name;
+        userToUpdate.lastname = lastname ?? userToUpdate.lastname;
+        userToUpdate.email = email ?? userToUpdate.email;
+        userToUpdate.tel = tel ?? userToUpdate.tel;
+        userToUpdate.address = address ?? userToUpdate.address;
+
+        await userToUpdate.save();
+
+        const userResponse = userToUpdate.toJSON();
+        delete userResponse.password;
+        res.json({ message: "Usuario actualizado.", user: userResponse });
 
     } catch (error) {
-        console.error("Error al actualizar perfil de usuario:", error);
-        res.status(500).json({ message: "Error interno del servidor.", error: error.message });
+        console.error("Error al actualizar usuario:", error);
+        if (error.name === 'SequelizeValidationError') {
+            return res.status(400).json({ message: 'Error de validación', errors: error.errors.map(e => e.message) });
+        }
+        res.status(500).json({ message: "Error interno del servidor." });
     }
 });
 
-router.delete("/users/:id", verifyToken, isAdminOrSuperAdmin, async (req, res) => {
+router.delete("/users/:id", verifyToken, async (req, res) => {
     const { id: targetUserId } = req.params;
 
     try {
         const userToDelete = await User.findByPk(targetUserId);
         if (!userToDelete) return res.status(404).json({ message: "Usuario no encontrado." });
 
-        if (req.userId === targetUserId) {
-            return res.status(403).json({ message: "No puedes eliminar tu propia cuenta." });
-        }
-
-        if (req.userRole === 'admin') {
-            if (userToDelete.role !== 'user') {
-                return res.status(403).json({ message: "Los administradores solo pueden eliminar usuarios comunes." });
-            }
-        } else if (req.userRole === 'superadmin') {
+        if (req.dniusuario === targetUserId) {
             if (userToDelete.role === 'superadmin') {
                 const superAdminCount = await User.count({ where: { role: 'superadmin' } });
                 if (superAdminCount <= 1) {
                     return res.status(403).json({ message: "No se puede eliminar el último Superadministrador." });
                 }
             }
-            
+        } else {
+            if (req.userRole === 'user') {
+                return res.status(403).json({ message: "No tienes permiso para eliminar otros perfiles." });
+            }
+
+            if (req.userRole === 'admin') {
+                if (userToDelete.role !== 'user') {
+                    return res.status(403).json({ message: "Los administradores solo pueden eliminar usuarios comunes." });
+                }
+            } else if (req.userRole === 'superadmin') {
+                if (userToDelete.role === 'superadmin') {
+                    const superAdminCount = await User.count({ where: { role: 'superadmin' } });
+                    if (superAdminCount <= 1) {
+                        return res.status(403).json({ message: "No se puede eliminar el último Superadministrador." });
+                    }
+                }
+            } else {
+                return res.status(403).json({ message: "Acceso denegado para eliminar este perfil." });
+            }
         }
 
         await userToDelete.destroy();
         res.json({ message: `Usuario con DNI ${targetUserId} eliminado.` });
 
     } catch (error) {
-        console.error("Error al eliminar usuario:", error); 
+        console.error("Error al eliminar usuario:", error);
         res.status(500).json({ message: "Error interno del servidor." });
     }
 });
@@ -179,7 +203,7 @@ router.put("/users/:id/assign-admin", verifyToken, isSuperAdmin, async (req, res
             return res.status(400).json({ message: "No se puede modificar el rol de un Superadministrador de esta forma." });
         }
         if (userToPromote.role !== 'user') {
-             return res.status(400).json({ message: "Solo los usuarios con rol 'user' pueden ser promovidos." });
+            return res.status(400).json({ message: "Solo los usuarios con rol 'user' pueden ser promovidos." });
         }
 
 
@@ -189,7 +213,7 @@ router.put("/users/:id/assign-admin", verifyToken, isSuperAdmin, async (req, res
         delete userResponse.password;
         res.json({ message: `${userToPromote.name} ahora es administrador.`, user: userResponse });
     } catch (error) {
-        console.error("Error al asignar rol de administrador:", error); 
+        console.error("Error al asignar rol de administrador:", error);
         res.status(500).json({ message: "Error interno del servidor." });
     }
 });

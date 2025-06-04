@@ -21,18 +21,26 @@ router.get("/users", verifyToken, isAdminOrSuperAdmin, async (req, res) => {
     }
 });
 
-router.get("/users/:id", verifyToken, isAdminOrSuperAdmin, async (req, res) => {
-    const { id } = req.params;
+router.get('/users/:id', verifyToken, async (req, res) => {
     try {
-        const user = await User.findByPk(id, { attributes: { exclude: ['password'] } });
-        if (!user) return res.status(404).json({ message: "Usuario no encontrado." });
+        const userIdToFetch = req.params.id; 
 
-        
-        if (req.userRole === 'admin' && (user.role === 'superadmin' || (user.role === 'admin' && user.id !== req.userId))) {
-            return res.status(403).json({ message: "Acceso denegado a este perfil de usuario." });
+        const loggedInUserId = req.dniusuario; 
+
+        if (req.userRole !== 'admin' && req.userRole !== 'superadmin' && userIdToFetch !== loggedInUserId) {
+            return res.status(403).json({ message: "Acceso denegado. Solo puedes ver tu propio perfil." });
+        }
+
+        const user = await User.findByPk(userIdToFetch, {
+            attributes: ['id', 'name', 'lastname', 'email', 'tel', 'address'] 
+        });
+
+        if (!user) {
+            return res.status(404).json({ message: "Usuario no encontrado." });
         }
         res.json(user);
     } catch (error) {
+        console.error("Error al obtener perfil de usuario:", error);
         res.status(500).json({ message: "Error interno del servidor." });
     }
 });
@@ -88,62 +96,39 @@ router.post("/users", async (req, res) => {
     }
 });
 
-router.put("/users/:id", verifyToken, isAdminOrSuperAdmin, async (req, res) => {
-    const { id: targetUserId } = req.params;
-    const { name, lastname, email, tel, address, role } = req.body; 
-
+router.put('/users/:id', verifyToken, async (req, res) => {
     try {
-        const userToUpdate = await User.findByPk(targetUserId);
-        if (!userToUpdate) return res.status(404).json({ message: "Usuario no encontrado." });
+        const userIdToUpdate = req.params.id;      
+        const loggedInUserId = req.dniusuario;     
+        const loggedInUserRole = req.userRole;     
 
-        if (req.userRole === 'admin') {
-            if (userToUpdate.role !== 'user') {
-                return res.status(403).json({ message: "Los administradores solo pueden modificar usuarios comunes." });
-            }
+        
+        if (loggedInUserRole === 'user' && userIdToUpdate !== loggedInUserId) {
             
-            if (role && role !== userToUpdate.role) {
-                 return res.status(403).json({ message: "Los administradores no pueden cambiar roles de usuario." });
-            }
-        } 
+            return res.status(403).json({ message: "Acceso denegado. Solo puedes modificar tu propio perfil." });
+        }
+        
 
-        else if (req.userRole === 'superadmin') {
-            if (userToUpdate.role === 'superadmin' && req.userId !== targetUserId) {
-                return res.status(403).json({ message: "No se puede modificar otro Superadministrador directamente." });
-            }
-            if (role && ['user', 'admin'].includes(role)) { 
-                userToUpdate.role = role;
-            } else if (role && role !== userToUpdate.role) {
-                return res.status(400).json({ message: `Rol '${role}' inválido para asignación.` });
-            }
+       
+        const { name, lastname, email, tel, address } = req.body;
+        const user = await User.findByPk(userIdToUpdate);
+
+        if (!user) {
+            return res.status(404).json({ message: "Usuario no encontrado." });
         }
 
-        
-        if (email && email !== userToUpdate.email) {
-            const existingEmailUser = await User.findOne({ where: { email } });
-            if (existingEmailUser && existingEmailUser.id !== targetUserId) {
-                return res.status(409).json({ message: "El nuevo correo electrónico ya está en uso." });
-            }
-        }
+        user.name = name || user.name;
+        user.lastname = lastname || user.lastname;
+        user.email = email || user.email;
+        user.tel = tel || user.tel;
+        user.address = address || user.address;
 
-        
-        userToUpdate.name = name ?? userToUpdate.name;
-        userToUpdate.lastname = lastname ?? userToUpdate.lastname;
-        userToUpdate.email = email ?? userToUpdate.email;
-        userToUpdate.tel = tel ?? userToUpdate.tel;
-        userToUpdate.address = address ?? userToUpdate.address;
-
-        await userToUpdate.save(); 
-        
-        const userResponse = userToUpdate.toJSON();
-        delete userResponse.password; 
-        res.json({ message: "Usuario actualizado.", user: userResponse });
+        await user.save();
+        res.json({ message: "Perfil actualizado exitosamente.", user: user });
 
     } catch (error) {
-        console.error("Error al actualizar usuario:", error); 
-        if (error.name === 'SequelizeValidationError') {
-            return res.status(400).json({ message: 'Error de validación', errors: error.errors.map(e => e.message) });
-        }
-        res.status(500).json({ message: "Error interno del servidor." });
+        console.error("Error al actualizar perfil de usuario:", error);
+        res.status(500).json({ message: "Error interno del servidor.", error: error.message });
     }
 });
 

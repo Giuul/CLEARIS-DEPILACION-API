@@ -42,10 +42,26 @@ export const isAdmin = (req, res, next) => {
     }
 };
 
+export const isProfessional = (req, res, next) => {
+    if (req.userRole && req.userRole === 'professional') {
+        next();
+    } else {
+        return res.status(403).json({ message: 'Acceso denegado. Se requiere el rol de Profesional.' });
+    }
+};
+
 export const isAdminOrSuperAdmin = (req, res, next) => {
     if (req.userRole && (req.userRole === 'admin' || req.userRole === 'superadmin')) {
         next();
     } else {
         return res.status(403).json({ message: 'Acceso denegado. Se requiere rol de Administrador o Superadministrador.' });
+    }
+};
+
+export const isProfessionalOrAdminOrSuperAdmin = (req, res, next) => {
+    if (req.userRole && ['professional', 'admin', 'superadmin'].includes(req.userRole)) {
+        next();
+    } else {
+        return res.status(403).json({ message: 'Acceso denegado. Se requiere rol de Profesional, Administrador o Superadministrador.' });
     }
 };

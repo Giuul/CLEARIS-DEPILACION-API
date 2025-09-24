@@ -14,6 +14,10 @@ export const Turno = sequelize.define("turno", {
     type: DataTypes.INTEGER, 
     allowNull: false,
   },
+  idprofesional: {
+        type: DataTypes.STRING,
+        allowNull: true, 
+    },
   dia: {
     type: DataTypes.DATEONLY,
     allowNull: false,
@@ -35,6 +39,12 @@ Turno.belongsTo(User, {
   foreignKey: 'dniusuario', 
   targetKey: 'id',         
   as: 'usuario'
+});
+
+Turno.belongsTo(User, {
+    foreignKey: 'idprofesional',
+    targetKey: 'id',
+    as: 'profesional' 
 });
 
 Turno.belongsTo(Service, {

@@ -15,7 +15,8 @@ router.get("/misturnos", verifyToken, async (req, res) => {
             where: { dniusuario },
             include: [
                 { model: User, as: "usuario" },
-                { model: Service, as: "servicio" }
+                { model: Service, as: "servicio" },
+                { model: User, as: "Professional", attributes: ['id', 'name', 'lastname'] } 
             ]
         });
 
@@ -31,28 +32,31 @@ router.get("/misturnos", verifyToken, async (req, res) => {
     }
 });
 
+
 router.get("/admin/turnos", verifyToken, async (req, res) => {
-  try {
-    if (req.userRole !== 'admin' && req.userRole !== 'superadmin') {
-      return res.status(403).json({ mensaje: "Acceso denegado. Se requiere rol de administrador." });
+    try {
+        if (req.userRole !== 'admin' && req.userRole !== 'superadmin') {
+            return res.status(403).json({ mensaje: "Acceso denegado. Se requiere rol de administrador." });
+        }
+
+        const turnos = await Turno.findAll({
+            include: [
+                { model: User, as: "usuario" }, 
+                { model: Service, as: "servicio" },
+                { model: User, as: "Professional", attributes: ['id', 'name', 'lastname'] } 
+            ]
+        });
+
+        res.json(turnos);
+    } catch (error) {
+        console.error("Error al obtener todos los turnos (admin):", error);
+        res.status(500).json({
+            mensaje: "Error al obtener todos los turnos",
+            error: error.message
+        });
     }
-
-    const turnos = await Turno.findAll({
-      include: [
-        { model: User, as: "usuario" }, 
-        { model: Service, as: "servicio" }
-      ]
-    });
-
-    res.json(turnos);
-  } catch (error) {
-    console.error("Error al obtener todos los turnos (admin):", error);
-    res.status(500).json({
-      mensaje: "Error al obtener todos los turnos",
-      error: error.message
-    });
-  }
 });
+
 
 router.get("/misturnos/:id", async (req, res) => {
     const { id } = req.params;
@@ -61,7 +65,8 @@ router.get("/misturnos/:id", async (req, res) => {
         const turno = await Turno.findByPk(id, {
             include: [
                 { model: User, as: "usuario" },
-                { model: Service, as: "servicio" }
+                { model: Service, as: "servicio" },
+                { model: User, as: "Professional", attributes: ['id', 'name', 'lastname'] }
             ]
         });
 
@@ -114,12 +119,48 @@ router.get("/profesional", verifyToken, async (req, res) => {
     }
 });
 
+router.get("/profesional", verifyToken, async (req, res) => {
+    const allowedRoles = ['profesional', 'admin', 'superadmin'];
+
+    if (!allowedRoles.includes(req.userRole)) {
+        return res.status(403).json({ mensaje: "Acceso denegado. Se requiere rol de Profesional o Administrador." });
+    }
+    const profesionalId = req.dniusuario; 
+    
+    const today = new Date();
+    const todayStart = new Date(today.setHours(0, 0, 0, 0));
+    const todayEnd = new Date(today.setHours(23, 59, 59, 999));
+
+    try {
+        const turnosHoy = await Turno.findAll({
+            where: {
+                professionalId: profesionalId, 
+                dia: {
+                    [Op.between]: [todayStart, todayEnd]
+                }
+            },
+            order: [['hora', 'ASC']],
+            include: [
+                { model: User, as: "usuario", attributes: ['id', 'name', 'lastname', 'tel', 'email'] }, 
+                { model: Service, as: "servicio", attributes: ['id', 'name'] } 
+            ]
+        });
+
+        res.json(turnosHoy);
+
+    } catch (error) {
+        res.status(500).json({ 
+            mensaje: "Error al obtener la agenda del profesional",
+            error: error.message
+        });
+    }
+});
 
 router.post('/misturnos', verifyToken, async (req, res) => {
     try {
         const loggedInUserDNI = req.dniusuario; 
-        const loggedInUserRole = req.userRole;   
-        const { dia, hora, idservicio, userId: userIdFromRequestBody } = req.body;
+        const loggedInUserRole = req.userRole;   
+        const { dia, hora, idservicio, userId: userIdFromRequestBody, id_profesional } = req.body; 
 
         
         if (!dia || !hora || !idservicio) {
@@ -127,37 +168,48 @@ router.post('/misturnos', verifyToken, async (req, res) => {
         }
 
         let dniusuarioParaElTurno; 
+        let professionalIdToAssign = null; 
 
-        if ((loggedInUserRole === 'admin' || loggedInUserRole === 'superadmin') && userIdFromRequestBody) {
-            if (userIdFromRequestBody === loggedInUserDNI) {
-                dniusuarioParaElTurno = loggedInUserDNI;
-            } else {
-                const targetUser = await User.findByPk(userIdFromRequestBody); 
-                if (!targetUser) {
-                    return res.status(404).json({ mensaje: `El usuario con DNI ${userIdFromRequestBody} para el cual se intenta agendar el turno no existe.` });
-                }
-               
-                if (loggedInUserRole === 'admin' && (targetUser.role === 'admin' || targetUser.role === 'superadmin')) {
-                    return res.status(403).json({ mensaje: "Los administradores solo pueden agendar turnos para usuarios con rol 'user' o para sí mismos." });
-                }
-                dniusuarioParaElTurno = targetUser.id; 
+        if (loggedInUserRole === 'admin' || loggedInUserRole === 'superadmin') {
+            
+            if (!userIdFromRequestBody || !id_profesional) {
+                return res.status(400).json({ mensaje: 'Como Administrador, debe especificar el DNI del usuario y el ID del profesional.' });
             }
-        } else if ((loggedInUserRole === 'admin' || loggedInUserRole === 'superadmin') && !userIdFromRequestBody) {
-           
-            dniusuarioParaElTurno = loggedInUserDNI;
+            
+            const targetUser = await User.findByPk(userIdFromRequestBody); 
+            if (!targetUser) {
+                return res.status(404).json({ mensaje: `El usuario con DNI ${userIdFromRequestBody} para el cual se intenta agendar el turno no existe.` });
+            }
+
+            const targetProfessional = await User.findOne({ 
+                where: { id: id_profesional, role: 'professional' } 
+            });
+            
+            if (!targetProfessional) {
+                 return res.status(404).json({ mensaje: `El profesional con DNI ${id_profesional} no existe o no tiene el rol 'professional'.` });
+            }
+            
+            if (loggedInUserRole === 'admin' && (targetUser.role === 'admin' || targetUser.role === 'superadmin')) {
+                return res.status(403).json({ mensaje: "Los administradores solo pueden agendar turnos para usuarios con rol 'user' o para sí mismos." });
+            }
+
+            dniusuarioParaElTurno = targetUser.id;
+            professionalIdToAssign = targetProfessional.id;
+
+        
         } else if (loggedInUserRole === 'user'){ 
             dniusuarioParaElTurno = loggedInUserDNI;
+            
         } else {
-            return res.status(403).json({ mensaje: "No tiene permisos para realizar esta acción con los datos proporcionados."});
+            return res.status(403).json({ mensaje: "No tiene permisos para realizar esta acción."});
         }
-
-      
 
         const nuevoTurno = await Turno.create({
             dniusuario: dniusuarioParaElTurno, 
             dia,
             hora,
-            idservicio: parseInt(idservicio) 
+            idservicio: parseInt(idservicio),
+            professionalId: professionalIdToAssign 
         });
 
         res.status(201).json(nuevoTurno);
@@ -177,7 +229,6 @@ router.post('/misturnos', verifyToken, async (req, res) => {
         });
     }
 });
-
 
 router.put("/misturnos/:id", async (req, res) => {
     const { id } = req.params;

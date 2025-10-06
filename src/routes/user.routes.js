@@ -40,6 +40,24 @@ router.get("/users/:id", verifyToken, async (req, res) => {
     }
 });
 
+
+router.get("/professionals", verifyToken, isAdminOrSuperAdmin, async (req, res) => {
+    try {
+        const professionals = await User.findAll({
+            where: { role: 'professional' }, 
+            attributes: ['id', 'name', 'lastname'] 
+        });
+        
+       
+        
+        res.json(professionals);
+    } catch (error) {
+        console.error("Error al obtener profesionales:", error);
+        res.status(500).json({ message: "Error interno del servidor al obtener profesionales." });
+    }
+});
+
+
 router.post("/users", async (req, res) => {
     const { id, name, lastname, email, tel, address, password, repPassword } = req.body;
     let { role } = req.body;
@@ -54,11 +72,24 @@ router.post("/users", async (req, res) => {
 
         } else if (req.userRole === 'superadmin' || req.userRole === 'admin') {
 
-            const validRolesToAssign = (req.userRole === 'superadmin') ? ['user', 'admin'] : ['user'];
-            if (role && !validRolesToAssign.includes(role)) {
-                return res.status(400).json({ message: `Rol '${role}' inválido o no tienes permiso para asignarlo.` });
+            if (req.userRole === 'superadmin') {
+                const validRolesToAssign = ['user', 'professional', 'admin'];
+                if (role && !validRolesToAssign.includes(role)) {
+                    return res.status(400).json({ message: `Rol '${role}' inválido para asignación.` });
+                }
+            } else if (req.userRole === 'admin') {
+                const validRolesToAssign = ['user', 'professional'];
+                if (role && !validRolesToAssign.includes(role)) {
+                    return res.status(400).json({ message: `Rol '${role}' inválido o no tienes permiso para asignarlo.` });
+                }
+            } else {
+                if (role && role !== 'user') {
+                    return res.status(403).json({ message: "No tiene permiso para asignar roles." });
+                }
             }
-            if (!role) role = 'user';
+            if (!role || (role && role === 'superadmin')) {
+                role = 'user'; 
+            }
         } else {
 
             role = 'user';
@@ -93,36 +124,49 @@ router.post("/users", async (req, res) => {
 router.put("/users/:id", verifyToken, async (req, res) => {
     const { id: targetUserId } = req.params;
     const { name, lastname, email, tel, address, role } = req.body;
+    const currentUserRole = req.userRole;
+    const currentUserId = req.dniusuario;
 
     try {
         const userToUpdate = await User.findByPk(targetUserId);
         if (!userToUpdate) return res.status(404).json({ message: "Usuario no encontrado." });
 
-        if (req.userRole === 'user') {
-            if (req.dniusuario !== targetUserId) {
+        if (role && role !== userToUpdate.role) {
+            
+            const allowedRoles = ['user', 'professional', 'admin', 'superadmin'];
+            if (role && !allowedRoles.includes(role)) { 
+                return res.status(400).json({ message: `Rol '${role}' inválido o desconocido.` });
+            }
+
+            if (currentUserRole === 'user') {
+                return res.status(403).json({ message: "No tiene permiso para cambiar el rol de usuario." });
+            }
+
+            if (currentUserRole === 'admin') {
+                
+                if (!['user', 'professional'].includes(userToUpdate.role) && userToUpdate.id !== currentUserId) {
+                    return res.status(403).json({ message: "Los administradores solo pueden modificar usuarios comunes o profesionales." });
+                }
+                if (!['user', 'professional'].includes(role)) {
+                    return res.status(403).json({ message: "Los administradores solo pueden asignar los roles 'user' o 'professional'." });
+                }
+                userToUpdate.role = role;
+
+            } else if (currentUserRole === 'superadmin') {
+                if (userToUpdate.role === 'superadmin' && userToUpdate.id !== currentUserId) {
+                    return res.status(403).json({ message: "No se puede modificar el rol de otro Superadministrador directamente." });
+                }
+                userToUpdate.role = role;
+            }
+        }
+        
+      
+        if (!role || role === userToUpdate.role) {
+            if (currentUserRole === 'user' && currentUserId !== targetUserId) {
                 return res.status(403).json({ message: "Acceso denegado: solo puede modificar su propio perfil." });
             }
-            if (role && role !== userToUpdate.role) {
-                return res.status(403).json({ message: "No puede cambiar el rol de usuario." });
-            }
-        } else if (req.userRole === 'admin') {
-            if (!['user', 'professional'].includes(userToUpdate.role)) {
-                return res.status(403).json({ message: "Los administradores solo pueden modificar usuarios comunes o profesionales." });
-            }
-            if (role && !['user', 'professional'].includes(role)) {
-                 return res.status(403).json({ message: "Los administradores solo pueden asignar los roles 'user' o 'professional'." });
-            }
-            if (role) {
-                userToUpdate.role = role;
-            }
-        } else if (req.userRole === 'superadmin') {
-            if (userToUpdate.role === 'superadmin' && req.userId !== targetUserId) {
-                return res.status(403).json({ message: "No se puede modificar otro Superadministrador directamente." });
-            }
-            if (role && ['user', 'admin', 'professional'].includes(role)) {
-                userToUpdate.role = role;
-            } else if (role && role !== userToUpdate.role) {
-                return res.status(400).json({ message: `Rol '${role}' inválido para asignación.` });
+            if (currentUserRole === 'admin' && !['user', 'professional'].includes(userToUpdate.role)) {
+                return res.status(403).json({ message: "Los administradores solo pueden modificar datos de usuarios comunes o profesionales." });
             }
         }
 

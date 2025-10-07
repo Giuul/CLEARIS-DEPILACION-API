@@ -16,7 +16,7 @@ router.get("/misturnos", verifyToken, async (req, res) => {
             include: [
                 { model: User, as: "usuario" },
                 { model: Service, as: "servicio" },
-                { model: User, as: "Professional", attributes: ['id', 'name', 'lastname'] } 
+                { model: User, as: "profesional", attributes: ['id', 'name', 'lastname'] } 
             ]
         });
 
@@ -43,7 +43,7 @@ router.get("/admin/turnos", verifyToken, async (req, res) => {
             include: [
                 { model: User, as: "usuario" }, 
                 { model: Service, as: "servicio" },
-                { model: User, as: "Professional", attributes: ['id', 'name', 'lastname'] } 
+                { model: User, as: "profesional", attributes: ['id', 'name', 'lastname'] } 
             ]
         });
 
@@ -66,7 +66,7 @@ router.get("/misturnos/:id", async (req, res) => {
             include: [
                 { model: User, as: "usuario" },
                 { model: Service, as: "servicio" },
-                { model: User, as: "Professional", attributes: ['id', 'name', 'lastname'] }
+                { model: User, as: "profesional", attributes: ['id', 'name', 'lastname'] }
             ]
         });
 
@@ -182,7 +182,7 @@ router.post('/misturnos', verifyToken, async (req, res) => {
             }
 
             const targetProfessional = await User.findOne({ 
-                where: { id: id_profesional, role: 'professional' } 
+                where: { id: id_profesional, role: 'profesional' } 
             });
             
             if (!targetProfessional) {

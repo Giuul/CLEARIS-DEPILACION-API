@@ -9,9 +9,9 @@ router.get("/users", verifyToken, isAdminOrSuperAdmin, async (req, res) => {
     try {
         let queryOptions = { attributes: { exclude: ['password'] } };
         if (req.userRole === 'admin') {
-            queryOptions.where = { role: ['user', 'professional'] };
+            queryOptions.where = { role: ['user', 'profesional'] };
         } else if (req.userRole === 'superadmin') {
-            queryOptions.where = { role: ['user', 'admin', 'professional'] };
+            queryOptions.where = { role: ['user', 'admin', 'profesional'] };
         }
         const users = await User.findAll(queryOptions);
         res.json(users);
@@ -44,7 +44,7 @@ router.get("/users/:id", verifyToken, async (req, res) => {
 router.get("/professionals", verifyToken, isAdminOrSuperAdmin, async (req, res) => {
     try {
         const professionals = await User.findAll({
-            where: { role: 'professional' }, 
+            where: { role: 'profesional, admin, user' }, 
             attributes: ['id', 'name', 'lastname'] 
         });
         
@@ -73,12 +73,12 @@ router.post("/users", async (req, res) => {
         } else if (req.userRole === 'superadmin' || req.userRole === 'admin') {
 
             if (req.userRole === 'superadmin') {
-                const validRolesToAssign = ['user', 'professional', 'admin'];
+                const validRolesToAssign = ['user', 'profesional', 'admin'];
                 if (role && !validRolesToAssign.includes(role)) {
                     return res.status(400).json({ message: `Rol '${role}' inválido para asignación.` });
                 }
             } else if (req.userRole === 'admin') {
-                const validRolesToAssign = ['user', 'professional'];
+                const validRolesToAssign = ['user', 'profesional'];
                 if (role && !validRolesToAssign.includes(role)) {
                     return res.status(400).json({ message: `Rol '${role}' inválido o no tienes permiso para asignarlo.` });
                 }
@@ -133,7 +133,7 @@ router.put("/users/:id", verifyToken, async (req, res) => {
 
         if (role && role !== userToUpdate.role) {
             
-            const allowedRoles = ['user', 'professional', 'admin', 'superadmin'];
+            const allowedRoles = ['user', 'profesional', 'admin', 'superadmin'];
             if (role && !allowedRoles.includes(role)) { 
                 return res.status(400).json({ message: `Rol '${role}' inválido o desconocido.` });
             }
@@ -144,11 +144,11 @@ router.put("/users/:id", verifyToken, async (req, res) => {
 
             if (currentUserRole === 'admin') {
                 
-                if (!['user', 'professional'].includes(userToUpdate.role) && userToUpdate.id !== currentUserId) {
+                if (!['user', 'profesional'].includes(userToUpdate.role) && userToUpdate.id !== currentUserId) {
                     return res.status(403).json({ message: "Los administradores solo pueden modificar usuarios comunes o profesionales." });
                 }
-                if (!['user', 'professional'].includes(role)) {
-                    return res.status(403).json({ message: "Los administradores solo pueden asignar los roles 'user' o 'professional'." });
+                if (!['user', 'profesional'].includes(role)) {
+                    return res.status(403).json({ message: "Los administradores solo pueden asignar los roles 'user' o 'profesional'." });
                 }
                 userToUpdate.role = role;
 
@@ -165,7 +165,7 @@ router.put("/users/:id", verifyToken, async (req, res) => {
             if (currentUserRole === 'user' && currentUserId !== targetUserId) {
                 return res.status(403).json({ message: "Acceso denegado: solo puede modificar su propio perfil." });
             }
-            if (currentUserRole === 'admin' && !['user', 'professional'].includes(userToUpdate.role)) {
+            if (currentUserRole === 'admin' && !['user', 'profesional'].includes(userToUpdate.role)) {
                 return res.status(403).json({ message: "Los administradores solo pueden modificar datos de usuarios comunes o profesionales." });
             }
         }
@@ -218,7 +218,7 @@ router.delete("/users/:id", verifyToken, async (req, res) => {
             }
 
             if (req.userRole === 'admin') {
-                if (!['user', 'professional'].includes(userToDelete.role)) {
+                if (!['user', 'profesional'].includes(userToDelete.role)) {
                     return res.status(403).json({ message: "Los administradores solo pueden eliminar usuarios comunes o profesionales." });
                 }
             } else if (req.userRole === 'superadmin') {
@@ -305,7 +305,7 @@ router.put("/users/:id/assign-professional", verifyToken, isAdminOrSuperAdmin, a
         }
 
 
-        userToPromote.role = 'professional';
+        userToPromote.role = 'profesional';
         await userToPromote.save();
         const userResponse = userToPromote.toJSON();
         delete userResponse.password;
@@ -322,11 +322,11 @@ router.put("/users/:id/revoke-professional", verifyToken, isAdminOrSuperAdmin, a
         const userToDemote = await User.findByPk(targetUserId);
         if (!userToDemote) return res.status(404).json({ message: "Usuario no encontrado." });
 
-        if (req.userRole === 'admin' && userToDemote.role !== 'professional') {
+        if (req.userRole === 'admin' && userToDemote.role !== 'profesional') {
             return res.status(403).json({ message: "Un administrador solo puede revocar el rol de 'profesional'." });
         }
         
-        if (req.userRole === 'superadmin' && !['professional', 'admin'].includes(userToDemote.role)) {
+        if (req.userRole === 'superadmin' && !['profesional', 'admin'].includes(userToDemote.role)) {
              return res.status(403).json({ message: "Un superadministrador solo puede revocar el rol de 'profesional' o 'admin'." });
         }
 

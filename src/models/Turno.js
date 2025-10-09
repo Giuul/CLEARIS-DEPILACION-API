@@ -35,20 +35,29 @@ export const Turno = sequelize.define("turno", {
 });
 
 
+// Relación con el usuario 
 Turno.belongsTo(User, {
-  foreignKey: 'dniusuario', 
-  targetKey: 'id',         
-  as: 'usuario'
+  foreignKey: 'dniusuario',
+  targetKey: 'id',
+  as: 'usuario',
+  onDelete: 'CASCADE',     
+  onUpdate: 'CASCADE'
 });
 
+// Relación con el servicio
 Turno.belongsTo(Service, {
   foreignKey: 'idservicio',
   targetKey: 'id',
-  as: 'servicio'
+  as: 'servicio',
+  onDelete: 'CASCADE',
+  onUpdate: 'CASCADE'
 });
 
+//  Relación con el profesional
 Turno.belongsTo(User, {
   foreignKey: 'profesionalId',
   targetKey: 'id',
-  as: 'profesional' 
+  as: 'profesional',
+  onDelete: 'CASCADE',    
+  onUpdate: 'CASCADE'
 });

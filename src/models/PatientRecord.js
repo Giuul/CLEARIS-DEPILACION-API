@@ -25,4 +25,6 @@ PatientRecord.belongsTo(User, {
     foreignKey: 'dniusuario',
     targetKey: 'id',
     as: 'paciente',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE'
 });

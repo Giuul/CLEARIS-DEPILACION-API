@@ -29,10 +29,14 @@ MedicalSession.belongsTo(PatientRecord, {
     foreignKey: 'idFicha',
     targetKey: 'id',
     as: 'fichaClinica',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE'
 });
 
 MedicalSession.belongsTo(User, {
     foreignKey: 'idprofesional',
     targetKey: 'id',
     as: 'profesional',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE'
 });

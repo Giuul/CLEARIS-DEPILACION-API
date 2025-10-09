@@ -41,16 +41,22 @@ router.get("/users/:id", verifyToken, async (req, res) => {
 });
 
 
-router.get("/professionals", verifyToken, isAdminOrSuperAdmin, async (req, res) => {
+router.get("/professionals", verifyToken, async (req, res) => {
+    
+    const allowedRoles = ['user', 'admin', 'superadmin'];
+
+    if (!allowedRoles.includes(req.userRole)) {
+        return res.status(403).json({ mensaje: "Acceso denegado. Se requiere autenticación para ver profesionales." });
+    }
+
     try {
         const professionals = await User.findAll({
-            where: { role: 'profesional, admin, user' }, 
+            where: { role: 'profesional' }, 
             attributes: ['id', 'name', 'lastname'] 
         });
         
-       
-        
         res.json(professionals);
+
     } catch (error) {
         console.error("Error al obtener profesionales:", error);
         res.status(500).json({ message: "Error interno del servidor al obtener profesionales." });

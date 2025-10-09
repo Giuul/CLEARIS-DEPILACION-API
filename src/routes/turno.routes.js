@@ -81,7 +81,7 @@ router.get("/misturnos/:id", async (req, res) => {
     }
 });
 
-router.get("/profesional", verifyToken, async (req, res) => {
+router.get("/professional", verifyToken, async (req, res) => {
     const allowedRoles = ['profesional', 'admin', 'superadmin'];
 
     if (!allowedRoles.includes(req.userRole)) {
@@ -119,42 +119,6 @@ router.get("/profesional", verifyToken, async (req, res) => {
     }
 });
 
-router.get("/profesional", verifyToken, async (req, res) => {
-    const allowedRoles = ['profesional', 'admin', 'superadmin'];
-
-    if (!allowedRoles.includes(req.userRole)) {
-        return res.status(403).json({ mensaje: "Acceso denegado. Se requiere rol de Profesional o Administrador." });
-    }
-    const profesionalId = req.dniusuario; 
-    
-    const today = new Date();
-    const todayStart = new Date(today.setHours(0, 0, 0, 0));
-    const todayEnd = new Date(today.setHours(23, 59, 59, 999));
-
-    try {
-        const turnosHoy = await Turno.findAll({
-            where: {
-                professionalId: profesionalId, 
-                dia: {
-                    [Op.between]: [todayStart, todayEnd]
-                }
-            },
-            order: [['hora', 'ASC']],
-            include: [
-                { model: User, as: "usuario", attributes: ['id', 'name', 'lastname', 'tel', 'email'] }, 
-                { model: Service, as: "servicio", attributes: ['id', 'name'] } 
-            ]
-        });
-
-        res.json(turnosHoy);
-
-    } catch (error) {
-        res.status(500).json({ 
-            mensaje: "Error al obtener la agenda del profesional",
-            error: error.message
-        });
-    }
-});
 
 router.post('/misturnos', verifyToken, async (req, res) => {
     try {

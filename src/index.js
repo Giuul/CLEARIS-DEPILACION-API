@@ -27,7 +27,7 @@ app.use(medicalRoutes);
 
 async function main() {
   try {
-    await sequelize.sync({ force: false });
+    await sequelize.sync({ alter: true });
     console.log('Base de datos conectada y sincronizada.');
 
     app.listen(3000, () => console.log('Server on 3000'));

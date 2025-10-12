@@ -8,10 +8,27 @@ const router = Router();
 router.get("/service", async (req, res) => {
   try {
     const services = await Service.findAll();
-    res.json(services);
+    const servicesWithImages = services.map(service => {
+      let imagenBase64 = null;
+      if (service.imagen) {
+        imagenBase64 = Buffer.from(service.imagen).toString("base64");
+      }
+
+      return {
+        id: service.id,
+        nombre: service.nombre,
+        descripcion: service.descripcion,
+        duracion: service.duracion,
+        imagen: imagenBase64,
+      };
+    });
+
+    res.json(servicesWithImages);
   } catch (error) {
     console.error("Error al obtener servicios:", error);
-    res.status(500).json({ message: "Error interno del servidor al obtener servicios." });
+    res
+      .status(500)
+      .json({ message: "Error interno del servidor al obtener servicios." });
   }
 });
 
@@ -19,14 +36,28 @@ router.get("/service/:id", async (req, res) => {
   const { id } = req.params;
   try {
     const service = await Service.findByPk(id);
+
     if (service) {
-      res.json(service);
+      let imagenBase64 = null;
+      if (service.imagen) {
+        imagenBase64 = Buffer.from(service.imagen).toString("base64");
+      }
+
+      res.json({
+        id: service.id,
+        nombre: service.nombre,
+        descripcion: service.descripcion,
+        duracion: service.duracion,
+        imagen: imagenBase64,
+      });
     } else {
       res.status(404).json({ message: "Servicio no encontrado." });
     }
   } catch (error) {
     console.error(`Error al obtener servicio con ID ${id}:`, error);
-    res.status(500).json({ message: "Error interno del servidor al obtener el servicio." });
+    res
+      .status(500)
+      .json({ message: "Error interno del servidor al obtener el servicio." });
   }
 });
 

@@ -8,23 +8,38 @@ import { verifyToken } from '../middleware/auth.js';
 const router = Router()
 
 router.get("/misturnos", verifyToken, async (req, res) => {
+    console.log("CRASH AQUI");
     try {
-        const dniusuario = req.dniusuario;
+        const userId = req.dniusuario;
+        const userRole = req.userRole; 
+        
+        console.log("-> EJECUTANDO GET /MISTURNOS (VERSIÓN CORREGIDA) <-");
+        console.log("ROL RECIBIDO:", userRole); 
+        console.log("ID RECIBIDO:", userId); 
+        
+        let whereClause = {}; 
+
+        if (userRole === 'admin' || userRole === 'superadmin') {
+        } else if (userRole === 'profesional') {
+            whereClause = { profesionalId: userId }; 
+            console.log("FILTRO APLICADO: profesionalId");
+        } else {
+            whereClause = { dniusuario: userId };
+            console.log("FILTRO APLICADO: dniusuario");
+        }
 
         const turnos = await Turno.findAll({
-            where: { dniusuario },
+            where: whereClause, 
             include: [
-                { model: User, as: "usuario", attributes: ['id', 'name', 'lastname']  },
+                { model: User, as: "usuario", attributes: ['id', 'name', 'lastname']  },
                 { model: Service, as: "servicio" },
                 { model: User, as: "profesional", attributes: ['id', 'name', 'lastname'] } 
             ]
         });
 
-        console.log("dniusuario recibido:", dniusuario);
-
         res.json(turnos);
     } catch (error) {
-        console.error("Error al obtener turnos del usuario:", error);
+        console.error("Error al obtener turnos:", error);
         res.status(500).json({
             mensaje: "Error al obtener tus turnos",
             error: error.message
@@ -188,7 +203,7 @@ router.post('/misturnos', verifyToken, async (req, res) => {
             dia,
             hora,
             idservicio: parseInt(idservicio),
-            professionalId: id_profesional
+            profesionalId: professionalIdToAssign
         });
 
         res.status(201).json(nuevoTurno);

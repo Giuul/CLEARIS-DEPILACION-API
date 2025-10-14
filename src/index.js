@@ -11,7 +11,7 @@ import turnoRoutes from "./routes/turno.routes.js"
 import loginRoutes from "./routes/login.routes.js"
 import "./models/PatientRecord.js"; 
 import "./models/MedicalSession.js";
-import medicalRoutes from "./routes/medical.routes.js";
+import medicalRoutes from "./routes/historial.routes.js";
 
 const app = express();
 
@@ -27,7 +27,7 @@ app.use(medicalRoutes);
 
 async function main() {
   try {
-    await sequelize.sync({ alter: true });
+    await sequelize.sync({ alter: false }); 
     console.log('Base de datos conectada y sincronizada.');
 
     app.listen(3000, () => console.log('Server on 3000'));

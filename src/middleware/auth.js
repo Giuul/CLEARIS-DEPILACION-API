@@ -43,7 +43,7 @@ export const isAdmin = (req, res, next) => {
 };
 
 export const isProfessional = (req, res, next) => {
-    if (req.userRole && req.userRole === 'professional') {
+    if (req.userRole && req.userRole === 'profesional') {
         next();
     } else {
         return res.status(403).json({ message: 'Acceso denegado. Se requiere el rol de Profesional.' });
@@ -59,7 +59,7 @@ export const isAdminOrSuperAdmin = (req, res, next) => {
 };
 
 export const isProfessionalOrAdminOrSuperAdmin = (req, res, next) => {
-    if (req.userRole && ['professional', 'admin', 'superadmin'].includes(req.userRole)) {
+    if (req.userRole && ['profesional', 'admin', 'superadmin'].includes(req.userRole)) {
         next();
     } else {
         return res.status(403).json({ message: 'Acceso denegado. Se requiere rol de Profesional, Administrador o Superadministrador.' });

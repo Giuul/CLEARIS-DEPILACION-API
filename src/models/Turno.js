@@ -6,7 +6,7 @@ import { Service } from './Service.js';
 
 export const Turno = sequelize.define("turno", {
   id: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.STRING,
     primaryKey: true,
     autoIncrement: true,
   },

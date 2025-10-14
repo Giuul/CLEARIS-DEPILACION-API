@@ -4,7 +4,7 @@ import { User } from './User.js';
 
 export const PatientRecord = sequelize.define("patientRecord", {
     id: {
-        type: DataTypes.INTEGER,
+        type: DataTypes.STRING,
         primaryKey: true,
         autoIncrement: true,
     },

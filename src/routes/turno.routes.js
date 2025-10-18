@@ -7,25 +7,30 @@ import { verifyToken } from '../middleware/auth.js';
 
 const router = Router()
 
+
+// --- Lógica de la ruta /misturnos (para roles 'user', 'profesional' como cliente, etc.) ---
 router.get("/misturnos", verifyToken, async (req, res) => {
-    console.log("CRASH AQUI");
     try {
         const userId = req.dniusuario;
         const userRole = req.userRole;
 
-        console.log("-> EJECUTANDO GET /MISTURNOS (VERSIÓN CORREGIDA) <-");
-        console.log("ROL RECIBIDO:", userRole);
-        console.log("ID RECIBIDO:", userId);
-
-        let whereClause = {};
-
+        const today = new Date();
+        const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0); 
+        
+        const endRange = new Date(todayStart);
+        endRange.setDate(todayStart.getDate() + 7); 
+        const nextWeekEnd = new Date(endRange.getFullYear(), endRange.getMonth(), endRange.getDate(), 23, 59, 59, 999); 
+        
+        let whereClause = {
+            dia: {
+                [Op.between]: [todayStart, nextWeekEnd] 
+            }
+        };
         if (userRole === 'admin' || userRole === 'superadmin') {
         } else if (userRole === 'profesional') {
-            whereClause = { profesionalId: userId };
-            console.log("FILTRO APLICADO: profesionalId");
+            whereClause.profesionalId = userId;
         } else {
-            whereClause = { dniusuario: userId };
-            console.log("FILTRO APLICADO: dniusuario");
+            whereClause.dniusuario = userId;
         }
 
         const turnos = await Turno.findAll({
@@ -34,7 +39,8 @@ router.get("/misturnos", verifyToken, async (req, res) => {
                 { model: User, as: "usuario", attributes: ['id', 'name', 'lastname'] },
                 { model: Service, as: "servicio" },
                 { model: User, as: "profesional", attributes: ['id', 'name', 'lastname'] }
-            ]
+            ],
+            order: [['dia', 'ASC'], ['hora', 'ASC']] 
         });
 
         res.json(turnos);
@@ -50,16 +56,38 @@ router.get("/misturnos", verifyToken, async (req, res) => {
 
 router.get("/admin/turnos", verifyToken, async (req, res) => {
     try {
-        if (req.userRole !== 'admin' && req.userRole !== 'superadmin') {
-            return res.status(403).json({ mensaje: "Acceso denegado. Se requiere rol de administrador." });
+        if (req.userRole !== 'admin' && req.userRole !== 'superadmin' && req.userRole !== 'profesional') {
+            return res.status(403).json({ mensaje: "Acceso denegado. Se requiere rol de gestor." });
         }
+        
+        const today = new Date();
+        const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0); 
+        
+        const endRange = new Date(todayStart);
+        endRange.setDate(todayStart.getDate() + 7); 
+        const nextWeekEnd = new Date(endRange.getFullYear(), endRange.getMonth(), endRange.getDate(), 23, 59, 59, 999); 
 
+        let whereClause = {
+            dia: {
+                [Op.between]: [todayStart, nextWeekEnd] 
+            }
+        };
+        if (req.userRole === 'profesional') {
+            whereClause.profesionalId = req.dniusuario;
+            
+            if (req.query.asistio === 'true') {
+                whereClause.asistio = true;
+            }
+        }
+        
         const turnos = await Turno.findAll({
+            where: whereClause,
             include: [
                 { model: User, as: "usuario", attributes: ['id', 'name', 'lastname'] },
                 { model: Service, as: "servicio" },
                 { model: User, as: "profesional", attributes: ['id', 'name', 'lastname'] }
-            ]
+            ],
+            order: [['dia', 'ASC'], ['hora', 'ASC']] 
         });
 
         res.json(turnos);
@@ -75,7 +103,6 @@ router.get("/admin/turnos", verifyToken, async (req, res) => {
 
 router.get("/misturnos/:id", async (req, res) => {
     const { id } = req.params;
-    console.log("ID recibido:", id);
     try {
         const turno = await Turno.findByPk(id, {
             include: [
@@ -95,6 +122,39 @@ router.get("/misturnos/:id", async (req, res) => {
         res.status(500).json({ mensaje: "Error al obtener turno", error });
     }
 });
+
+router.put("/turnos/:id/asistencia", verifyToken, async (req, res) => {
+    const allowedRoles = ['admin', 'superadmin', 'profesional'];
+    if (!allowedRoles.includes(req.userRole)) {
+        return res.status(403).json({ mensaje: "Acceso denegado. Permiso insuficiente para marcar asistencia." });
+    }
+
+    const { id } = req.params;
+    const { asistio } = req.body; 
+
+    if (typeof asistio !== 'boolean') {
+        return res.status(400).json({ mensaje: "El valor de 'asistio' debe ser un booleano." });
+    }
+
+    try {
+        const turno = await Turno.findByPk(id);
+        if (!turno) {
+            return res.status(404).json({ mensaje: "Turno no encontrado" });
+        }
+
+        if (req.userRole === 'profesional' && turno.profesionalId !== req.dniusuario) {
+             return res.status(403).json({ mensaje: "Acceso denegado. No puede modificar la asistencia de un turno que no le fue asignado." });
+        }
+
+        await turno.update({ asistio: asistio });
+
+        res.json({ mensaje: "Asistencia actualizada correctamente", asistio: turno.asistio });
+    } catch (error) {
+        console.error("Error al actualizar asistencia:", error);
+        res.status(500).json({ mensaje: "Error al actualizar asistencia", error: error.message });
+    }
+});
+
 
 router.get("/professional", verifyToken, async (req, res) => {
     const allowedRoles = ['profesional', 'admin', 'superadmin'];
@@ -203,7 +263,8 @@ router.post('/misturnos', verifyToken, async (req, res) => {
             dia,
             hora,
             idservicio: parseInt(idservicio),
-            profesionalId: professionalIdToAssign
+            profesionalId: professionalIdToAssign,
+            asistio: false 
         });
 
         res.status(201).json(nuevoTurno);
@@ -236,15 +297,19 @@ router.put("/admin/turnos/:id", verifyToken, async (req, res) => {
     const horaMin = "15:00";
     const horaMax = "18:30";
 
-    if (!hora || hora < horaMin || hora > horaMax) {
+    if (hora && (hora < horaMin || hora > horaMax)) {
         return res.status(400).json({ mensaje: `La hora debe estar entre ${horaMin} y ${horaMax}` });
     }
 
     try {
         const turno = await Turno.findByPk(id);
         if (!turno) return res.status(404).json({ mensaje: "Turno no encontrado" });
-
-        await turno.update({ dia, hora });
+        
+        const updateFields = {};
+        if (dia) updateFields.dia = dia;
+        if (hora) updateFields.hora = hora;
+        
+        await turno.update(updateFields);
         res.json({ mensaje: "Turno actualizado correctamente (admin)", turno });
     } catch (error) {
         res.status(500).json({ mensaje: "Error al actualizar turno", error: error.message });

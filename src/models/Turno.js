@@ -26,9 +26,14 @@ export const Turno = sequelize.define("turno", {
     type: DataTypes.INTEGER,
     allowNull: false,
   },
-   profesionalId: { 
+    profesionalId: { 
     type: DataTypes.INTEGER,
     allowNull: true,
+  },
+  asistio: { 
+    type: DataTypes.BOOLEAN,
+    defaultValue: false, 
+    allowNull: false,
   }
 }, {
   timestamps: false,

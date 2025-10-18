@@ -10,37 +10,37 @@ const router = Router();
 router.get("/patients/:dni/sessions", verifyToken, isProfessionalOrAdminOrSuperAdmin, async (req, res) => {
     const { dni } = req.params;
     try {
-        const patientUser = await User.findOne({ 
+        const patientUser = await User.findOne({
             where: { id: dni },
-            attributes: ['id', 'name', 'lastname', 'email', 'tel'] 
+            attributes: ['id', 'name', 'lastname', 'email', 'tel']
         });
 
         if (!patientUser) {
             return res.status(404).json({ mensaje: "Usuario paciente no encontrado." });
         }
-        
-        const patientRecord = await PatientRecord.findOne({ 
+
+        const patientRecord = await PatientRecord.findOne({
             where: { dniusuario: dni },
-            attributes: ['id', 'observaciones'] 
+            attributes: ['id', 'observaciones']
         });
-        
+
         let sessions = [];
 
         if (patientRecord) {
             sessions = await MedicalSession.findAll({
                 where: { idFicha: patientRecord.id },
-                
-                include: [{ 
-                    model: User, 
-                    as: 'profesional', 
-                    attributes: ['id', 'name', 'lastname', 'email', 'tel'] 
+
+                include: [{
+                    model: User,
+                    as: 'profesional',
+                    attributes: ['id', 'name', 'lastname', 'email', 'tel']
                 }],
-                order: [['createdAt', 'DESC']], 
+                order: [['createdAt', 'DESC']],
             });
         }
-        
-        
-        const patientDataJson = patientUser.toJSON(); 
+
+
+        const patientDataJson = patientUser.toJSON();
         const patientDataWithRecord = {
             ...patientDataJson,
             observacionFicha: patientRecord ? patientRecord.observaciones : null
@@ -48,7 +48,7 @@ router.get("/patients/:dni/sessions", verifyToken, isProfessionalOrAdminOrSuperA
 
 
         res.json({
-            patient: patientDataWithRecord, 
+            patient: patientDataWithRecord,
             sessions: sessions
         });
 
@@ -81,30 +81,72 @@ router.put("/patients/:dni/record", verifyToken, isProfessionalOrAdminOrSuperAdm
 });
 
 
-router.post("/patients/:dni/sessions", verifyToken, isProfessional, async (req, res) => {
+router.get("/patients/:dni/sessions", verifyToken, isProfessionalOrAdminOrSuperAdmin, async (req, res) => {
     const { dni } = req.params;
-    const { descripcion } = req.body;
-    const { dniusuario: idprofesional } = req; 
-
     try {
-        const patientRecord = await PatientRecord.findOne({ where: { dniusuario: dni } });
-        if (!patientRecord) {
-            return res.status(404).json({ mensaje: "Ficha clínica no encontrada para este paciente." });
-        }
-
-        const newSession = await MedicalSession.create({
-            idFicha: patientRecord.id,
-            idprofesional,
-            observaciones: descripcion,
+        const patientUser = await User.findOne({
+            where: { id: dni },
+            attributes: ['id', 'name', 'lastname', 'email', 'tel']
         });
 
-        res.status(201).json({ mensaje: "Sesión agregada correctamente.", session: newSession });
+        if (!patientUser) {
+            return res.status(404).json({ mensaje: "Usuario paciente no encontrado." });
+        }
+
+        let [patientRecord, created] = await PatientRecord.findOrCreate({
+            where: { dniusuario: dni },
+            defaults: { dniusuario: dni, observaciones: "" }
+        });
+
+        const sessions = await MedicalSession.findAll({
+            where: { idFicha: patientRecord.id },
+            include: [{
+                model: User,
+                as: 'profesional',
+                attributes: ['id', 'name', 'lastname', 'email', 'tel']
+            }],
+            order: [['createdAt', 'DESC']],
+        });
+
+        const patientDataJson = patientUser.toJSON();
+        const patientDataWithRecord = {
+            ...patientDataJson,
+            observacionFicha: patientRecord.observaciones
+        };
+
+        res.json({
+            patient: patientDataWithRecord,
+            sessions
+        });
+
     } catch (error) {
-        console.error("Error al agregar sesión:", error);
-        res.status(500).json({ mensaje: "Error interno del servidor." });
+        console.error("Error al obtener sesiones:", error);
+        res.status(500).json({ mensaje: "Error interno del servidor al obtener historial." });
     }
 });
 
+
+router.put("/sessions/:id/observacion", verifyToken, isProfessionalOrAdminOrSuperAdmin, async (req, res) => {
+    const { id } = req.params;
+    const { observaciones } = req.body;
+
+    try {
+        const session = await MedicalSession.findByPk(id);
+        if (!session) return res.status(404).json({ mensaje: "Sesión no encontrada." });
+
+        session.observaciones = observaciones ?? session.observaciones;
+        await session.save();
+
+        const updatedSession = await MedicalSession.findByPk(id, {
+            include: [{ model: User, as: 'profesional', attributes: ['id', 'name', 'lastname'] }]
+        });
+
+        res.json(updatedSession);
+    } catch (error) {
+        console.error("Error al actualizar observación:", error);
+        res.status(500).json({ mensaje: "Error interno del servidor." });
+    }
+});
 
 
 export default router;

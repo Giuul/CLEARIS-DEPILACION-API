@@ -19,7 +19,7 @@ export const MedicalSession = sequelize.define("medicalSession", {
     },
     observaciones: {
         type: DataTypes.TEXT,
-        allowNull: false,
+        allowNull: true,
     },
 }, {
     timestamps: true,

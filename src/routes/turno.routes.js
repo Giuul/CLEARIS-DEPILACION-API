@@ -3,12 +3,13 @@ import { Turno } from "../models/Turno.js";
 import { User } from "../models/User.js";
 import { Service } from "../models/Service.js";
 import { Op } from 'sequelize';
+import { Sequelize } from 'sequelize';
 import { verifyToken } from '../middleware/auth.js';
 
 const router = Router()
 
 
-// --- Lógica de la ruta /misturnos (para roles 'user', 'profesional' como cliente, etc.) ---
+
 router.get("/misturnos", verifyToken, async (req, res) => {
     try {
         const userId = req.dniusuario;
@@ -123,36 +124,41 @@ router.get("/misturnos/:id", async (req, res) => {
     }
 });
 
-router.put("/turnos/:id/asistencia", verifyToken, async (req, res) => {
-    const allowedRoles = ['admin', 'superadmin', 'profesional'];
-    if (!allowedRoles.includes(req.userRole)) {
-        return res.status(403).json({ mensaje: "Acceso denegado. Permiso insuficiente para marcar asistencia." });
-    }
 
-    const { id } = req.params;
-    const { asistio } = req.body; 
-
-    if (typeof asistio !== 'boolean') {
-        return res.status(400).json({ mensaje: "El valor de 'asistio' debe ser un booleano." });
-    }
-
+router.get("/turnos/ocupados", verifyToken, async (req, res) => {
     try {
-        const turno = await Turno.findByPk(id);
-        if (!turno) {
-            return res.status(404).json({ mensaje: "Turno no encontrado" });
+            const { profesionalId, dia } = req.query;
+
+            if (!profesionalId || !dia) {
+                return res.status(400).json({ mensaje: 'Faltan parámetros: profesionalId y dia son requeridos.' });
+            }
+
+            const profesionalIdNum = parseInt(profesionalId, 10);
+            if (isNaN(profesionalIdNum)) {
+                return res.status(400).json({ mensaje: 'El profesionalId debe ser un número válido.' });
+            }
+
+            
+            const turnos = await Turno.findAll({
+                where: {
+                    profesionalId: profesionalIdNum,
+                    dia: dia
+                },
+                attributes: ['hora'] 
+            });
+
+            
+            const horasOcupadas = turnos.map(t => t.hora);
+
+            res.json(horasOcupadas);
+
+        } catch (error) {
+            console.error("Error en /turnos/ocupados:", error);
+            res.status(500).json({
+                mensaje: 'Error interno del servidor al obtener turnos ocupados',
+                error: error.message
+            });
         }
-
-        if (req.userRole === 'profesional' && turno.profesionalId !== req.dniusuario) {
-             return res.status(403).json({ mensaje: "Acceso denegado. No puede modificar la asistencia de un turno que no le fue asignado." });
-        }
-
-        await turno.update({ asistio: asistio });
-
-        res.json({ mensaje: "Asistencia actualizada correctamente", asistio: turno.asistio });
-    } catch (error) {
-        console.error("Error al actualizar asistencia:", error);
-        res.status(500).json({ mensaje: "Error al actualizar asistencia", error: error.message });
-    }
 });
 
 
@@ -199,10 +205,10 @@ router.post('/misturnos', verifyToken, async (req, res) => {
     try {
         const loggedInUserDNI = req.dniusuario;
         const loggedInUserRole = req.userRole;
-        const { dia, hora, idservicio, userId: userIdFromRequestBody, id_profesional } = req.body;
+        const { dia, hora, idservicio, userId: userIdFromRequestBody, profesionalId } = req.body;
 
 
-        if (!dia || !hora || !idservicio || !id_profesional) {
+        if (!dia || !hora || !idservicio || !profesionalId) {
             return res.status(400).json({ mensaje: 'Faltan campos obligatorios para el turno (día, hora, servicio, profesional).' });
         }
 
@@ -226,11 +232,11 @@ router.post('/misturnos', verifyToken, async (req, res) => {
             }
 
             const targetProfessional = await User.findOne({
-                where: { id: id_profesional, role: 'profesional' }
+                where: { id: profesionalId, role: 'profesional' }
             });
 
             if (!targetProfessional) {
-                return res.status(404).json({ mensaje: `El profesional con DNI ${id_profesional} no existe o no tiene el rol 'profesional'.` });
+                return res.status(404).json({ mensaje: `El profesional con DNI ${profesionalId} no existe o no tiene el rol 'profesional'.` });
             }
 
             professionalIdToAssign = targetProfessional.id;
@@ -244,12 +250,12 @@ router.post('/misturnos', verifyToken, async (req, res) => {
 
             dniusuarioParaElTurno = loggedInUserDNI;
 
-            const targetProfessional = await User.findOne({
-                where: { id: id_profesional, role: 'profesional' }
+             const targetProfessional = await User.findOne({
+             where: { id: profesionalId, role: 'profesional' }
             });
 
             if (!targetProfessional) {
-                return res.status(404).json({ mensaje: `El profesional con DNI ${id_profesional} no existe o no tiene el rol 'profesional'.` });
+                return res.status(404).json({ mensaje: `El profesional con DNI ${profesionalId} no existe o no tiene el rol 'profesional'.` });
             }
 
             professionalIdToAssign = targetProfessional.id;
@@ -257,6 +263,17 @@ router.post('/misturnos', verifyToken, async (req, res) => {
         } else {
             return res.status(403).json({ mensaje: "No tiene permisos para realizar esta acción." });
         }
+
+        const turnoExistente = await Turno.findOne({
+            where: {
+                dia,
+                hora,
+                profesionalId: professionalIdToAssign
+            }
+        });
+        if (turnoExistente) {
+            return res.status(400).json({ mensaje: "Este horario ya está ocupado para el profesional seleccionado." });
+        }; 
 
         const nuevoTurno = await Turno.create({
             dniusuario: dniusuarioParaElTurno,

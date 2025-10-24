@@ -34,6 +34,10 @@ export const Turno = sequelize.define("turno", {
     type: DataTypes.BOOLEAN,
     defaultValue: false, 
     allowNull: false,
+  },
+  observaciones: {
+    type: DataTypes.TEXT, 
+    allowNull: true,      
   }
 }, {
   timestamps: false,

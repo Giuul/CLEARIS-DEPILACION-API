@@ -81,6 +81,43 @@ router.put("/patients/:dni/record", verifyToken, isProfessionalOrAdminOrSuperAdm
 });
 
 
+router.get("/turnos/paciente/:dni/historial", verifyToken, async (req, res) => {
+    const { dni } = req.params;
+    
+    const allowedRoles = ['profesional', 'admin', 'superadmin'];
+    if (!allowedRoles.includes(req.userRole)) {
+        return res.status(403).json({ mensaje: "Acceso denegado. Se requiere rol de gestor para ver historial." });
+    }
+    
+    const today = new Date();
+    const todayFormatted = today.toISOString().split('T')[0]; 
+    
+    try {
+        const turnosHistoricos = await Turno.findAll({
+            where: {
+                dniusuario: dni, 
+                dia: {
+                    [Op.lt]: todayFormatted 
+                }
+            },
+            include: [
+                { model: User, as: "usuario", attributes: ['id', 'name', 'lastname', 'email', 'tel'] },
+                { model: Service, as: "servicio" },
+                { model: User, as: "profesional", attributes: ['id', 'name', 'lastname'] }
+            ],
+            order: [['dia', 'DESC'], ['hora', 'DESC']] 
+        });
+
+        res.json(turnosHistoricos); 
+
+    } catch (error) {
+        console.error("Error al obtener historial de turnos:", error);
+        res.status(500).json({ 
+            mensaje: "Error interno del servidor al obtener el historial de turnos.",
+            error: error.message
+        });
+    }
+});
 router.get("/patients/:dni/sessions", verifyToken, isProfessionalOrAdminOrSuperAdmin, async (req, res) => {
     const { dni } = req.params;
     try {

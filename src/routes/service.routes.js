@@ -8,6 +8,7 @@ const router = Router();
 router.get("/service", async (req, res) => {
   try {
     const services = await Service.findAll();
+
     const servicesWithImages = services.map(service => {
       let imagenBase64 = null;
       if (service.imagen) {
@@ -26,9 +27,7 @@ router.get("/service", async (req, res) => {
     res.json(servicesWithImages);
   } catch (error) {
     console.error("Error al obtener servicios:", error);
-    res
-      .status(500)
-      .json({ message: "Error interno del servidor al obtener servicios." });
+    res.status(500).json({ message: "Error interno del servidor al obtener servicios." });
   }
 });
 
@@ -37,37 +36,48 @@ router.get("/service/:id", async (req, res) => {
   try {
     const service = await Service.findByPk(id);
 
-    if (service) {
-      let imagenBase64 = null;
-      if (service.imagen) {
-        imagenBase64 = Buffer.from(service.imagen).toString("base64");
-      }
+    if (!service) return res.status(404).json({ message: "Servicio no encontrado." });
 
-      res.json({
-        id: service.id,
-        nombre: service.nombre,
-        descripcion: service.descripcion,
-        duracion: service.duracion,
-        imagen: imagenBase64,
-      });
-    } else {
-      res.status(404).json({ message: "Servicio no encontrado." });
+    let imagenBase64 = null;
+    if (service.imagen) {
+      imagenBase64 = Buffer.from(service.imagen).toString("base64");
     }
+
+    res.json({
+      id: service.id,
+      nombre: service.nombre,
+      descripcion: service.descripcion,
+      duracion: service.duracion,
+      imagen: imagenBase64,
+    });
   } catch (error) {
     console.error(`Error al obtener servicio con ID ${id}:`, error);
-    res
-      .status(500)
-      .json({ message: "Error interno del servidor al obtener el servicio." });
+    res.status(500).json({ message: "Error interno del servidor al obtener el servicio." });
   }
 });
 
 router.post("/service", async (req, res) => {
   const { nombre, descripcion, duracion, imagen } = req.body;
+
   try {
     const existing = await Service.findOne({ where: { nombre } });
-    if (existing) return res.status(400).json({ message: "El nombre del servicio ya existe." });
+    if (existing) {
+      return res.status(400).json({ message: "El nombre del servicio ya existe." });
+    }
 
-    const service = await Service.create({ nombre, descripcion, duracion, imagen });
+    let imagenBuffer = null;
+    if (imagen && imagen.startsWith("data:image")) {
+      const base64Data = imagen.split(",")[1];
+      imagenBuffer = Buffer.from(base64Data, "base64");
+    }
+
+    const service = await Service.create({
+      nombre,
+      descripcion,
+      duracion,
+      imagen: imagenBuffer || imagen || null,
+    });
+
     res.status(201).json(service);
   } catch (error) {
     console.error("Error al crear servicio:", error);
@@ -85,11 +95,30 @@ router.put("/service/:id", async (req, res) => {
 
     if (nombre && nombre !== service.nombre) {
       const existing = await Service.findOne({ where: { nombre } });
-      if (existing) return res.status(400).json({ message: "El nombre del servicio ya existe." });
+      if (existing) {
+        return res.status(400).json({ message: "El nombre del servicio ya existe." });
+      }
     }
 
-    await service.update({ nombre, descripcion, duracion, imagen });
-    res.json(service);
+    const updatedFields = {
+      nombre: nombre ?? service.nombre,
+      descripcion: descripcion ?? service.descripcion,
+      duracion: duracion ?? service.duracion,
+      imagen: service.imagen
+    };
+
+    if (imagen && imagen.trim() !== "") {
+      if (imagen.startsWith("data:image")) {
+        const base64Data = imagen.split(",")[1];
+        updatedFields.imagen = Buffer.from(base64Data, "base64");
+      } else {
+        updatedFields.imagen = imagen;
+      }
+    }
+
+    await service.update(updatedFields);
+    res.json({ message: "Servicio actualizado correctamente." });
+
   } catch (error) {
     console.error("Error al editar servicio:", error);
     res.status(500).json({ message: "Error interno del servidor al editar servicio." });
@@ -112,10 +141,7 @@ router.delete("/service/:id", async (req, res) => {
         idservicio: id,
         [Op.or]: [
           { dia: { [Op.gt]: today } },
-          {
-            dia: today,
-            hora: { [Op.gte]: currentTime }
-          }
+          { dia: today, hora: { [Op.gte]: currentTime } }
         ]
       }
     });

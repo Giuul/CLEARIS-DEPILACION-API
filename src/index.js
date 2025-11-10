@@ -9,15 +9,16 @@ import userRoutes from "./routes/user.routes.js"
 import serviceRoutes from "./routes/service.routes.js"
 import turnoRoutes from "./routes/turno.routes.js"
 import loginRoutes from "./routes/login.routes.js"
-import "./models/PatientRecord.js"; 
+import "./models/PatientRecord.js";
 import "./models/MedicalSession.js";
 import medicalRoutes from "./routes/historial.routes.js";
 
 const app = express();
 
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 app.use(userRoutes);
 app.use(serviceRoutes);
@@ -27,7 +28,7 @@ app.use(medicalRoutes);
 
 async function main() {
   try {
-    await sequelize.sync({ alter: false }); 
+    await sequelize.sync({ alter: false });
     console.log('Base de datos conectada y sincronizada.');
 
     app.listen(3000, () => console.log('Server on 3000'));

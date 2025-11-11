@@ -12,7 +12,7 @@ router.get("/service", async (req, res) => {
     const servicesWithImages = services.map(service => {
       let imagenBase64 = null;
       if (service.imagen) {
-        imagenBase64 = Buffer.from(service.imagen).toString("base64");
+        imagenBase64 = `data:image/jpeg;base64,${Buffer.from(service.imagen).toString("base64")}`;
       }
 
       return {
@@ -40,7 +40,8 @@ router.get("/service/:id", async (req, res) => {
 
     let imagenBase64 = null;
     if (service.imagen) {
-      imagenBase64 = Buffer.from(service.imagen).toString("base64");
+      imagenBase64 = `data:image/jpeg;base64,${Buffer.from(service.imagen).toString("base64")}`;
+
     }
 
     res.json({
@@ -75,7 +76,7 @@ router.post("/service", async (req, res) => {
       nombre,
       descripcion,
       duracion,
-      imagen: imagenBuffer || imagen || null,
+      imagen: imagenBuffer || null,
     });
 
     res.status(201).json(service);
@@ -103,16 +104,13 @@ router.put("/service/:id", async (req, res) => {
     const updatedFields = {
       nombre: nombre ?? service.nombre,
       descripcion: descripcion ?? service.descripcion,
-      duracion: duracion ?? service.duracion,
-      imagen: service.imagen
+      duracion: duracion ?? service.duracion
     };
 
     if (imagen && imagen.trim() !== "") {
       if (imagen.startsWith("data:image")) {
         const base64Data = imagen.split(",")[1];
         updatedFields.imagen = Buffer.from(base64Data, "base64");
-      } else {
-        updatedFields.imagen = imagen;
       }
     }
 

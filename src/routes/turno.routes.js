@@ -10,8 +10,104 @@ const router = Router()
 
 const getTodayStart = () => {
     const today = new Date();
-    return new Date(today.setHours(0, 0, 0, 0)); 
+    return new Date(today.getFullYear(), today.getMonth(), today.getDate()); 
 };
+
+
+router.get("/misturnos", verifyToken, async (req, res) => {
+    try {
+        const userId = req.dniusuario;
+        const userRole = req.userRole;
+
+        const todayStart = getTodayStart(); 
+        
+        let whereClause = {
+            dniusuario: userId,
+            dia: {
+                [Op.gte]: todayStart 
+            }
+        };
+        
+        if (userRole === 'admin' || userRole === 'superadmin') {
+             whereClause = {
+                dia: { [Op.gte]: todayStart }
+             }
+        } else if (userRole === 'profesional') {
+             whereClause = {
+                profesionalId: userId,
+                dia: { [Op.gte]: todayStart }
+             }
+        }
+
+
+        const turnos = await Turno.findAll({
+            where: whereClause,
+            include: [
+                { model: User, as: "usuario", attributes: ['id', 'name', 'lastname'] },
+                { model: Service, as: "servicio" },
+                { model: User, as: "profesional", attributes: ['id', 'name', 'lastname'] }
+            ],
+            order: [['dia', 'ASC'], ['hora', 'ASC']] 
+        });
+
+        res.json(turnos);
+    } catch (error) {
+        console.error("Error al obtener turnos:", error);
+        res.status(500).json({
+            mensaje: "Error al obtener tus turnos",
+            error: error.message
+        });
+    }
+});
+
+router.get("/admin/turnos", verifyToken, async (req, res) => {
+    try {
+        if (req.userRole !== 'admin' && req.userRole !== 'superadmin' && req.userRole !== 'profesional') {
+            return res.status(403).json({ mensaje: "Acceso denegado. Se requiere rol de gestor." });
+        }
+        
+        const userId = req.dniusuario;
+        const userRole = req.userRole;
+        const dateQuery = req.query.dia; 
+
+        let whereClause = {};
+        const todayStart = getTodayStart(); 
+
+        if (userRole === 'profesional') {
+            whereClause.profesionalId = userId;
+        }
+
+        if (dateQuery) {
+            whereClause.dia = dateQuery;
+        } else {
+            
+            if (userRole === 'admin' || userRole === 'superadmin') {
+                whereClause.dia = { [Op.gte]: todayStart }; 
+            } else if (userRole === 'profesional') {
+                whereClause.dia = todayStart.toISOString().split("T")[0]; 
+            }
+        }
+        
+        
+        const turnos = await Turno.findAll({
+            where: whereClause,
+            include: [
+                { model: User, as: "usuario", attributes: ['id', 'name', 'lastname'] },
+                { model: Service, as: "servicio" },
+                { model: User, as: "profesional", attributes: ['id', 'name', 'lastname'] }
+            ],
+            order: [['dia', 'ASC'], ['hora', 'ASC']]
+        });
+
+        res.json(turnos);
+    } catch (error) {
+        console.error("Error al obtener todos los turnos (admin):", error);
+        res.status(500).json({
+            mensaje: "Error al obtener todos los turnos",
+            error: error.message
+        });
+    }
+});
 
 
 router.get("/misturnos", verifyToken, async (req, res) => {
@@ -49,52 +145,6 @@ router.get("/misturnos", verifyToken, async (req, res) => {
         console.error("Error al obtener turnos:", error);
         res.status(500).json({
             mensaje: "Error al obtener tus turnos",
-            error: error.message
-        });
-    }
-});
-
-router.get("/admin/turnos", verifyToken, async (req, res) => {
-    try {
-        if (req.userRole !== 'admin' && req.userRole !== 'superadmin' && req.userRole !== 'profesional') {
-            return res.status(403).json({ mensaje: "Acceso denegado. Se requiere rol de gestor." });
-        }
-        
-        const userId = req.dniusuario;
-        const userRole = req.userRole;
-        const todayStart = getTodayStart();
-
-        let whereClause = {
-            dia: {
-                [Op.gte]: todayStart 
-            }
-        };
-
-        if (userRole === 'profesional') {
-            whereClause.profesionalId = userId;
-            
-            if (req.query.asistio === 'true') {
-                 delete whereClause.dia; 
-                 whereClause.asistio = true;
-            }
-        }
-        
-        
-        const turnos = await Turno.findAll({
-            where: whereClause,
-            include: [
-                { model: User, as: "usuario", attributes: ['id', 'name', 'lastname'] },
-                { model: Service, as: "servicio" },
-                { model: User, as: "profesional", attributes: ['id', 'name', 'lastname'] }
-            ],
-            order: [['dia', 'ASC'], ['hora', 'ASC']] 
-        });
-
-        res.json(turnos);
-    } catch (error) {
-        console.error("Error al obtener todos los turnos (admin):", error);
-        res.status(500).json({
-            mensaje: "Error al obtener todos los turnos",
             error: error.message
         });
     }
@@ -174,33 +224,42 @@ router.get("/turnos/paciente/:dni/historial", verifyToken, async (req, res) => {
         return res.status(403).json({ mensaje: "Acceso denegado. Se requiere rol de gestor para ver historial." });
     }
     
-    const today = new Date();
-    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()); 
-    
     try {
+        const paciente = await User.findOne({
+            where: { id: dniNumber },
+            attributes: ['id', 'name', 'lastname'] 
+        });
+
+        if (!paciente) {
+            return res.status(404).json({ mensaje: "Paciente no encontrado." });
+        }
+
+        const todayString = new Date().toISOString().split('T')[0];
+        
         const turnosHistoricos = await Turno.findAll({
             where: {
                 dniusuario: dniNumber, 
                 dia: {
-                    [Op.lt]: todayStart 
-                }
+                    [Op.lt]: todayString 
+                },
+                asistio: true 
             },
             include: [
-                { model: User, as: "usuario", attributes: ['id', 'name', 'lastname'] },
-                
                 { model: Service, as: "servicio", attributes: ['id', 'nombre'] }, 
-                
                 { model: User, as: "profesional", attributes: ['id', 'name', 'lastname'] }
             ],
             order: [['dia', 'DESC'], ['hora', 'DESC']] 
         });
 
-        res.json(turnosHistoricos); 
+        res.json({
+            pacienteInfo: paciente,
+            historial: turnosHistoricos
+        });
 
     } catch (error) {
         console.error("Error al obtener historial de turnos:", error); 
         res.status(500).json({ 
-            mensaje: "Error interno del servidor al obtener el historial de turnos. Verifique la consola del servidor para detalles.",
+            mensaje: "Error interno del servidor.",
         });
     }
 });
@@ -345,6 +404,39 @@ router.post('/misturnos', verifyToken, async (req, res) => {
     }
 });
 
+router.put("/admin/turnos/:id/observaciones", verifyToken, async (req, res) => {
+    try {
+        const allowedRoles = ['profesional', 'admin', 'superadmin'];
+        if (!allowedRoles.includes(req.userRole)) {
+            return res.status(403).json({ mensaje: "Acceso denegado. Se requiere rol de gestor." });
+        }
+
+        const { id } = req.params;
+        const { observaciones } = req.body; 
+
+        if (typeof observaciones === 'undefined') {
+             return res.status(400).json({ mensaje: "Falta el campo 'observaciones' en el cuerpo de la solicitud." });
+        }
+        
+        const [affectedRows] = await Turno.update(
+            { observaciones: observaciones }, 
+            { where: { id: id } }
+        );
+
+        if (affectedRows === 0) {
+            return res.status(404).json({ mensaje: "Turno no encontrado o sin cambios." });
+        }
+
+        return res.status(200).json({ 
+            mensaje: "Observaciones actualizadas correctamente.",
+            turnoId: id
+        });
+
+    } catch (error) {
+        console.error("Error al actualizar observaciones:", error);
+        return res.status(500).json({ mensaje: "Error interno del servidor al actualizar observaciones." });
+    }
+});
 
 router.put("/admin/turnos/:id", verifyToken, async (req, res) => {
     if (req.userRole !== 'admin' && req.userRole !== 'superadmin') {

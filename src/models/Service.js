@@ -16,7 +16,7 @@ export const Service = sequelize.define('Service', {
     allowNull: false,
   },
   imagen: {
-    type: DataTypes.STRING,
+    type: DataTypes.BLOB('long'),
     allowNull: true,
   },
   duracion: {

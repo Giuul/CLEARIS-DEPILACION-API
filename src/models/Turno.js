@@ -44,7 +44,7 @@ export const Turno = sequelize.define("turno", {
 });
 
 
-// Relación con el usuario 
+
 Turno.belongsTo(User, {
   foreignKey: 'dniusuario',
   targetKey: 'id',
@@ -53,7 +53,7 @@ Turno.belongsTo(User, {
   onUpdate: 'CASCADE'
 });
 
-// Relación con el servicio
+
 Turno.belongsTo(Service, {
   foreignKey: 'idservicio',
   targetKey: 'id',
@@ -62,7 +62,7 @@ Turno.belongsTo(Service, {
   onUpdate: 'CASCADE'
 });
 
-//  Relación con el profesional
+
 Turno.belongsTo(User, {
   foreignKey: 'profesionalId',
   targetKey: 'id',

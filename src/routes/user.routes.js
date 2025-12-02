@@ -206,45 +206,35 @@ router.put("/users/:id", verifyToken, async (req, res) => {
 
 router.delete("/users/:id", verifyToken, async (req, res) => {
     const { id: targetUserId } = req.params;
+    const currentUserRole = req.userRole;
+    const currentUserId = req.dniusuario;
 
     try {
         const userToDelete = await User.findByPk(targetUserId);
         if (!userToDelete) return res.status(404).json({ message: "Usuario no encontrado." });
 
-        if (req.dniusuario === targetUserId) {
-            if (userToDelete.role === 'superadmin') {
-                const superAdminCount = await User.count({ where: { role: 'superadmin' } });
-                if (superAdminCount <= 1) {
-                    return res.status(403).json({ message: "No se puede eliminar el último Superadministrador." });
-                }
-            }
-        } else {
-            if (req.userRole === 'user') {
-                return res.status(403).json({ message: "No tienes permiso para eliminar otros perfiles." });
-            }
-
-            if (req.userRole === 'admin') {
-                if (!['user', 'profesional'].includes(userToDelete.role)) {
-                    return res.status(403).json({ message: "Los administradores solo pueden eliminar usuarios comunes o profesionales." });
-                }
-            } else if (req.userRole === 'superadmin') {
-                if (userToDelete.role === 'superadmin') {
-                    const superAdminCount = await User.count({ where: { role: 'superadmin' } });
-                    if (superAdminCount <= 1) {
-                        return res.status(403).json({ message: "No se puede eliminar el último Superadministrador." });
-                    }
-                }
-            } else {
-                return res.status(403).json({ message: "Acceso denegado para eliminar este perfil." });
-            }
+        if (currentUserRole === 'user' && currentUserId !== targetUserId) {
+            return res.status(403).json({ message: "No tienes permiso para eliminar otros perfiles." });
         }
 
+        if (currentUserRole === 'admin' && ['admin', 'superadmin'].includes(userToDelete.role)) {
+            return res.status(403).json({ message: "Los administradores solo pueden eliminar usuarios comunes o profesionales." });
+        }
+        
         await userToDelete.destroy();
         res.json({ message: `Usuario con DNI ${targetUserId} eliminado.` });
 
     } catch (error) {
         console.error("Error al eliminar usuario:", error);
-        res.status(500).json({ message: "Error interno del servidor." });
+        
+        if (error.name === 'SequelizeForeignKeyConstraintError') {
+            return res.status(409).json({ 
+                message: 'Este usuario tiene **turnos o citas programadas** asociadas. Para proceder con la eliminación, debe cancelar o eliminar todos sus turnos primero.',
+                detail: error.original.code 
+            });
+        }
+        
+        return res.status(500).json({ message: "Error interno del servidor." });
     }
 });
 

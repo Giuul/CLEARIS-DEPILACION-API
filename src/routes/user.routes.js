@@ -213,6 +213,13 @@ router.delete("/users/:id", verifyToken, async (req, res) => {
         const userToDelete = await User.findByPk(targetUserId);
         if (!userToDelete) return res.status(404).json({ message: "Usuario no encontrado." });
 
+        if (userToDelete.role === "superadmin") {
+            return res.status(403).json({
+                message: "El usuario SuperAdmin no puede eliminarse del sistema."
+            });
+        }
+
+
         if (currentUserRole === 'user' && currentUserId !== targetUserId) {
             return res.status(403).json({ message: "No tienes permiso para eliminar otros perfiles." });
         }
